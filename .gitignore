@@ -1,0 +1,27 @@
+data/
+__pycache__/
+*.pyc
+
+# Python / local environment
+.venv/
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Node / Electron dependencies and builds
+node_modules/
+build/
+dist/
+release/
+backend-dist/
+
+# Local runtime data
+app.log
+config.json
+history.db
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1613 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PushToBili UI 概念稿</title>
+  <style>
+    :root {
+      --font-ui: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      --font-num: "Segoe UI", "Microsoft YaHei UI", Arial, sans-serif;
+      --shadow-soft: 0 24px 70px rgba(14, 22, 39, .18);
+      --shadow-fine: 0 10px 30px rgba(14, 22, 39, .08);
+      --radius: 8px;
+      color-scheme: light;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: var(--font-ui);
+      background: #eef2f7;
+    }
+
+    body.single {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+
+    body.gallery {
+      padding: 36px;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+      align-items: start;
+    }
+
+    .gallery-item {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      color: #0f172a;
+    }
+
+    .gallery-item h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .gallery-item .artboard {
+      transform: scale(.49);
+      transform-origin: top left;
+      margin-bottom: -459px;
+    }
+
+    .artboard {
+      position: relative;
+      width: 1440px;
+      height: 900px;
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--bg);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .window {
+      position: absolute;
+      inset: 34px;
+      overflow: hidden;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      box-shadow: var(--window-shadow);
+    }
+
+    .topbar {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+      background: var(--top);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--mark-ink);
+      background: var(--mark);
+      font-weight: 900;
+      letter-spacing: 0;
+      box-shadow: var(--mark-shadow);
+    }
+
+    .brand-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-title strong {
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .brand-title span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search {
+      width: 240px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      font-size: 13px;
+    }
+
+    .status-pill {
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--success);
+      background: var(--success-soft);
+      border: 1px solid var(--success-line);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 15%, transparent);
+    }
+
+    .icon-btn,
+    .primary-btn,
+    .secondary-btn,
+    .ghost-btn,
+    .danger-btn {
+      height: 38px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .icon-btn {
+      width: 38px;
+      padding: 0;
+      color: var(--ink-2);
+      background: var(--surface-2);
+      border-color: var(--line);
+    }
+
+    .primary-btn {
+      color: var(--primary-ink);
+      background: var(--primary);
+      box-shadow: var(--primary-shadow);
+    }
+
+    .secondary-btn {
+      color: var(--primary);
+      background: var(--primary-soft);
+      border-color: var(--primary-line);
+    }
+
+    .ghost-btn {
+      color: var(--ink-2);
+      background: var(--surface-2);
+      border-color: var(--line);
+    }
+
+    .danger-btn {
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: var(--danger-line);
+    }
+
+    .layout {
+      height: calc(100% - 58px);
+      display: grid;
+      min-height: 0;
+    }
+
+    .nav {
+      border-right: 1px solid var(--line);
+      background: var(--nav);
+      padding: 18px 14px;
+      min-width: 0;
+    }
+
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-title {
+      margin: 10px 10px 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .nav-item {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      color: var(--ink-2);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+      box-shadow: inset 3px 0 0 var(--primary);
+    }
+
+    .glyph {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      color: var(--glyph-ink);
+      background: var(--glyph-bg);
+      font-size: 12px;
+      font-weight: 900;
+      font-family: var(--font-num);
+    }
+
+    .content {
+      min-width: 0;
+      min-height: 0;
+      padding: 18px;
+      background: var(--content);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+
+    .section-head h1,
+    .section-head h2,
+    .panel h2,
+    .panel h3 {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    .section-head h1 {
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .section-head p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      min-height: 78px;
+      padding: 13px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--card);
+    }
+
+    .metric span,
+    .label,
+    .meta,
+    .table th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 9px;
+      font: 800 18px/1.2 var(--font-num);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      box-shadow: var(--card-shadow);
+    }
+
+    .panel-head {
+      height: 52px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-head h2,
+    .panel-head h3 {
+      font-size: 16px;
+    }
+
+    .panel-body {
+      padding: 14px;
+      min-height: 0;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .input,
+    .textarea,
+    .mini-input {
+      min-width: 0;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--input);
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 13px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .input {
+      height: 38px;
+    }
+
+    .mini-input {
+      height: 34px;
+    }
+
+    .textarea {
+      height: 114px;
+      align-items: flex-start;
+      padding-top: 10px;
+      line-height: 1.6;
+      white-space: normal;
+      color: var(--muted);
+    }
+
+    .target-row,
+    .log-row,
+    .config-row {
+      display: grid;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--row);
+    }
+
+    .target-row {
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      padding: 11px 12px;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--avatar-ink);
+      background: var(--avatar);
+      font-weight: 900;
+      font-size: 14px;
+    }
+
+    .main-text {
+      min-width: 0;
+    }
+
+    .main-text strong {
+      display: block;
+      color: var(--ink);
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .main-text span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chip {
+      height: 27px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 8px;
+      color: var(--chip-ink);
+      background: var(--chip);
+      border: 1px solid var(--chip-line);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .log-row {
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      padding: 11px 12px;
+      font-size: 13px;
+      color: var(--ink-2);
+    }
+
+    .log-row span:nth-child(2) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .log-pin {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) 340px;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .hero-status {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      padding: 18px;
+      border-radius: 8px;
+      border: 1px solid var(--hero-line);
+      color: var(--hero-ink);
+      background: var(--hero);
+      box-shadow: var(--hero-shadow);
+    }
+
+    .hero-status h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    .hero-status p {
+      margin: 0;
+      color: var(--hero-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .big-number {
+      font: 900 46px/1 var(--font-num);
+      letter-spacing: 0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .table th,
+    .table td {
+      height: 42px;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .table td {
+      color: var(--ink-2);
+    }
+
+    .toast {
+      position: absolute;
+      right: 28px;
+      top: 72px;
+      z-index: 9;
+      min-width: 260px;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      border-radius: 8px;
+      color: var(--success);
+      background: var(--toast);
+      border: 1px solid var(--success-line);
+      box-shadow: var(--shadow-fine);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .drawer {
+      position: absolute;
+      top: 72px;
+      right: 26px;
+      width: 390px;
+      bottom: 24px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--drawer);
+      box-shadow: var(--shadow-soft);
+      z-index: 6;
+    }
+
+    .drawer h2 {
+      margin: 2px 0 14px;
+      font-size: 18px;
+    }
+
+    .config-row {
+      grid-template-columns: minmax(0, 1fr) 74px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    .config-row strong {
+      color: var(--ink);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .mode-name {
+      position: absolute;
+      left: 52px;
+      bottom: 26px;
+      z-index: 12;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border-radius: 8px;
+      color: var(--watermark);
+      background: var(--watermark-bg);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+
+    .concept-light {
+      --bg: linear-gradient(135deg, #eef7ff 0%, #f8fbff 44%, #fff6fb 100%);
+      --surface: #ffffff;
+      --surface-2: #f6f8fb;
+      --top: rgba(255,255,255,.96);
+      --content: #f6f8fc;
+      --nav: #ffffff;
+      --card: #ffffff;
+      --row: #fbfcff;
+      --input: #fbfcff;
+      --drawer: rgba(255,255,255,.96);
+      --line: #e4e9f0;
+      --ink: #101827;
+      --ink-2: #334155;
+      --muted: #6b778a;
+      --primary: #f35a9c;
+      --primary-ink: #fff;
+      --primary-soft: #fff0f6;
+      --primary-line: #ffd0e4;
+      --primary-shadow: 0 12px 22px rgba(243, 90, 156, .22);
+      --success: #158466;
+      --success-soft: #eafaf4;
+      --success-line: #bcebdc;
+      --danger: #c43b4b;
+      --danger-soft: #fff0f1;
+      --danger-line: #ffd2d8;
+      --mark: linear-gradient(135deg, #22b8f2, #f35a9c);
+      --mark-ink: #fff;
+      --mark-shadow: 0 10px 24px rgba(34,184,242,.25);
+      --glyph-bg: #eef6ff;
+      --glyph-ink: #2280c8;
+      --avatar: linear-gradient(135deg, #e0f7ff, #ffe4f1);
+      --avatar-ink: #d93886;
+      --chip: #eef9ff;
+      --chip-ink: #166ba3;
+      --chip-line: #cceefe;
+      --hero: linear-gradient(135deg, #1e293b 0%, #334155 58%, #22b8f2 140%);
+      --hero-ink: #fff;
+      --hero-muted: rgba(255,255,255,.72);
+      --hero-line: rgba(255,255,255,.2);
+      --hero-shadow: 0 18px 40px rgba(30,41,59,.18);
+      --toast: #f0fff8;
+      --window-shadow: 0 24px 70px rgba(45, 68, 110, .14);
+      --card-shadow: 0 10px 26px rgba(45, 68, 110, .06);
+      --watermark: #516172;
+      --watermark-bg: rgba(255,255,255,.72);
+    }
+
+    .concept-dark {
+      --bg: linear-gradient(145deg, #181716 0%, #202622 42%, #2a1d22 100%);
+      --surface: #151817;
+      --surface-2: #202522;
+      --top: #171b19;
+      --content: #101312;
+      --nav: #141816;
+      --card: #171d1a;
+      --row: #1d2420;
+      --input: #121615;
+      --drawer: rgba(21,24,23,.96);
+      --line: #2c3731;
+      --ink: #edf6ef;
+      --ink-2: #bfd0c5;
+      --muted: #809188;
+      --primary: #5ee0a9;
+      --primary-ink: #07130e;
+      --primary-soft: #183329;
+      --primary-line: #285b47;
+      --primary-shadow: 0 14px 32px rgba(94,224,169,.16);
+      --success: #6ee7b7;
+      --success-soft: #17352a;
+      --success-line: #2f6d55;
+      --danger: #ff8aa0;
+      --danger-soft: #351c24;
+      --danger-line: #67303e;
+      --mark: linear-gradient(135deg, #5ee0a9, #ff9b63);
+      --mark-ink: #07130e;
+      --mark-shadow: 0 10px 26px rgba(94,224,169,.12);
+      --glyph-bg: #26342d;
+      --glyph-ink: #95f0c4;
+      --avatar: #27342f;
+      --avatar-ink: #ffbd8a;
+      --chip: #2b211c;
+      --chip-ink: #ffbd8a;
+      --chip-line: #5f3a29;
+      --hero: linear-gradient(135deg, #233a30 0%, #1e2422 52%, #43272e 100%);
+      --hero-ink: #f6fff9;
+      --hero-muted: #adc7b8;
+      --hero-line: #355545;
+      --hero-shadow: 0 18px 48px rgba(0,0,0,.28);
+      --toast: #12291f;
+      --window-shadow: 0 28px 90px rgba(0,0,0,.34);
+      --card-shadow: none;
+      --watermark: #8fa49a;
+      --watermark-bg: rgba(20,24,22,.72);
+    }
+
+    .concept-dense {
+      --bg: #dfe6ef;
+      --surface: #fdfefe;
+      --surface-2: #f2f5f8;
+      --top: #f8fafc;
+      --content: #eef2f6;
+      --nav: #f9fbfd;
+      --card: #ffffff;
+      --row: #ffffff;
+      --input: #ffffff;
+      --drawer: #ffffff;
+      --line: #d7dee8;
+      --ink: #111827;
+      --ink-2: #2f3a4a;
+      --muted: #657285;
+      --primary: #2563eb;
+      --primary-ink: #fff;
+      --primary-soft: #eaf1ff;
+      --primary-line: #c9d9ff;
+      --primary-shadow: none;
+      --success: #047857;
+      --success-soft: #e7f7ef;
+      --success-line: #b9e8d0;
+      --danger: #b42336;
+      --danger-soft: #fff0f2;
+      --danger-line: #ffd1d9;
+      --mark: #2563eb;
+      --mark-ink: #fff;
+      --mark-shadow: none;
+      --glyph-bg: #edf3ff;
+      --glyph-ink: #2563eb;
+      --avatar: #eff4ff;
+      --avatar-ink: #2563eb;
+      --chip: #edf7f2;
+      --chip-ink: #047857;
+      --chip-line: #ccebdd;
+      --hero: #ffffff;
+      --hero-ink: #111827;
+      --hero-muted: #657285;
+      --hero-line: #d7dee8;
+      --hero-shadow: none;
+      --toast: #f1fff8;
+      --window-shadow: 0 20px 60px rgba(35, 48, 68, .18);
+      --card-shadow: none;
+      --watermark: #556170;
+      --watermark-bg: rgba(255,255,255,.76);
+    }
+
+    .concept-glass {
+      --bg: linear-gradient(135deg, #e7f9f5 0%, #f8fbff 45%, #fff1e8 100%);
+      --surface: rgba(255,255,255,.78);
+      --surface-2: rgba(255,255,255,.56);
+      --top: rgba(255,255,255,.72);
+      --content: rgba(255,255,255,.2);
+      --nav: rgba(255,255,255,.5);
+      --card: rgba(255,255,255,.72);
+      --row: rgba(255,255,255,.7);
+      --input: rgba(255,255,255,.8);
+      --drawer: rgba(255,255,255,.82);
+      --line: rgba(108,124,140,.22);
+      --ink: #14201e;
+      --ink-2: #2e4943;
+      --muted: #65766f;
+      --primary: #127f7a;
+      --primary-ink: #fff;
+      --primary-soft: rgba(18,127,122,.1);
+      --primary-line: rgba(18,127,122,.22);
+      --primary-shadow: 0 16px 34px rgba(18,127,122,.18);
+      --success: #158466;
+      --success-soft: rgba(225,250,240,.86);
+      --success-line: rgba(21,132,102,.25);
+      --danger: #b74455;
+      --danger-soft: rgba(255,240,241,.9);
+      --danger-line: rgba(183,68,85,.2);
+      --mark: linear-gradient(135deg, #127f7a, #f07f55);
+      --mark-ink: #fff;
+      --mark-shadow: 0 10px 26px rgba(18,127,122,.2);
+      --glyph-bg: rgba(18,127,122,.12);
+      --glyph-ink: #127f7a;
+      --avatar: linear-gradient(135deg, #d9f6f1, #ffe7d7);
+      --avatar-ink: #127f7a;
+      --chip: rgba(255,237,226,.8);
+      --chip-ink: #b5522d;
+      --chip-line: rgba(240,127,85,.25);
+      --hero: linear-gradient(135deg, rgba(18,127,122,.94), rgba(240,127,85,.88));
+      --hero-ink: #fff;
+      --hero-muted: rgba(255,255,255,.78);
+      --hero-line: rgba(255,255,255,.34);
+      --hero-shadow: 0 18px 42px rgba(33,91,84,.18);
+      --toast: rgba(241,255,248,.95);
+      --window-shadow: 0 26px 80px rgba(72, 94, 105, .2);
+      --card-shadow: 0 10px 30px rgba(72, 94, 105, .08);
+      --watermark: #4b5c56;
+      --watermark-bg: rgba(255,255,255,.55);
+    }
+
+    .concept-bento {
+      --bg: linear-gradient(135deg, #f2f7ff 0%, #fff8ed 48%, #eefaf3 100%);
+      --surface: #fffdf9;
+      --surface-2: #f7f3ed;
+      --top: #fffdf9;
+      --content: #f7f2ea;
+      --nav: #fffdf9;
+      --card: #fffdf9;
+      --row: #fffaf1;
+      --input: #fffdf9;
+      --drawer: #fffdf9;
+      --line: #e7ded1;
+      --ink: #231f1a;
+      --ink-2: #4a4035;
+      --muted: #796d5f;
+      --primary: #cc4c2f;
+      --primary-ink: #fff;
+      --primary-soft: #fff0eb;
+      --primary-line: #ffd2c7;
+      --primary-shadow: 0 14px 30px rgba(204,76,47,.18);
+      --success: #4f7c45;
+      --success-soft: #edf8ea;
+      --success-line: #cee7c8;
+      --danger: #b83545;
+      --danger-soft: #fff0f2;
+      --danger-line: #ffd0d8;
+      --mark: linear-gradient(135deg, #cc4c2f, #267a9c);
+      --mark-ink: #fff;
+      --mark-shadow: 0 12px 24px rgba(204,76,47,.14);
+      --glyph-bg: #edf8ea;
+      --glyph-ink: #4f7c45;
+      --avatar: #f4ecd8;
+      --avatar-ink: #cc4c2f;
+      --chip: #eaf4f8;
+      --chip-ink: #267a9c;
+      --chip-line: #cce5ee;
+      --hero: linear-gradient(135deg, #fffdf9 0%, #fff0eb 58%, #eaf4f8 100%);
+      --hero-ink: #231f1a;
+      --hero-muted: #796d5f;
+      --hero-line: #e7ded1;
+      --hero-shadow: 0 18px 42px rgba(80, 61, 42, .1);
+      --toast: #edf8ea;
+      --window-shadow: 0 26px 70px rgba(80, 61, 42, .17);
+      --card-shadow: 0 9px 28px rgba(80, 61, 42, .06);
+      --watermark: #65594d;
+      --watermark-bg: rgba(255,253,249,.75);
+    }
+
+    .concept-command {
+      --bg: linear-gradient(145deg, #f1f5f2 0%, #eff6fb 50%, #f9f3f0 100%);
+      --surface: #fbfcfb;
+      --surface-2: #f0f4f3;
+      --top: #fbfcfb;
+      --content: #edf3f2;
+      --nav: #1d2a27;
+      --card: #fbfcfb;
+      --row: #ffffff;
+      --input: #ffffff;
+      --drawer: #fbfcfb;
+      --line: #dce4e2;
+      --ink: #17211f;
+      --ink-2: #394946;
+      --muted: #687977;
+      --primary: #0f766e;
+      --primary-ink: #fff;
+      --primary-soft: #e6f5f2;
+      --primary-line: #bee3dc;
+      --primary-shadow: 0 14px 28px rgba(15,118,110,.18);
+      --success: #158466;
+      --success-soft: #e9f8f1;
+      --success-line: #c5eadb;
+      --danger: #bb3e4e;
+      --danger-soft: #fff0f2;
+      --danger-line: #ffd2d9;
+      --mark: #e05f48;
+      --mark-ink: #fff;
+      --mark-shadow: 0 12px 24px rgba(224,95,72,.18);
+      --glyph-bg: rgba(255,255,255,.12);
+      --glyph-ink: #fff;
+      --avatar: #e8f4f1;
+      --avatar-ink: #0f766e;
+      --chip: #f6ebe7;
+      --chip-ink: #b24d38;
+      --chip-line: #f0d0c6;
+      --hero: linear-gradient(135deg, #0f766e, #1d2a27);
+      --hero-ink: #fff;
+      --hero-muted: rgba(255,255,255,.72);
+      --hero-line: rgba(255,255,255,.2);
+      --hero-shadow: 0 20px 42px rgba(15,118,110,.18);
+      --toast: #effff8;
+      --window-shadow: 0 24px 70px rgba(42, 66, 62, .18);
+      --card-shadow: 0 10px 28px rgba(42, 66, 62, .06);
+      --watermark: #506360;
+      --watermark-bg: rgba(255,255,255,.75);
+    }
+
+    .concept-command .nav {
+      color: #fff;
+    }
+
+    .concept-command .nav .nav-title {
+      color: rgba(255,255,255,.48);
+    }
+
+    .concept-command .nav .nav-item {
+      color: rgba(255,255,255,.78);
+    }
+
+    .concept-command .nav .nav-item.active {
+      color: #fff;
+      background: rgba(255,255,255,.1);
+      box-shadow: inset 3px 0 0 #e05f48;
+    }
+
+    .concept-glass .window,
+    .concept-glass .topbar,
+    .concept-glass .panel,
+    .concept-glass .drawer {
+      backdrop-filter: blur(18px);
+    }
+
+    .view-a .layout {
+      grid-template-columns: 218px minmax(0, 1fr);
+    }
+
+    .view-a .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 14px;
+      height: 100%;
+    }
+
+    .view-a .hero-status {
+      grid-column: 1 / -1;
+    }
+
+    .view-a .work-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, .85fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .view-a .side-stack {
+      display: grid;
+      grid-template-rows: 214px minmax(0, 1fr);
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .view-b .layout {
+      grid-template-columns: 82px minmax(0, 1fr) 356px;
+    }
+
+    .view-b .nav {
+      padding: 14px 12px;
+    }
+
+    .view-b .nav-item {
+      width: 54px;
+      height: 54px;
+      justify-content: center;
+      padding: 0;
+      margin: 0 auto;
+    }
+
+    .view-b .nav-item span:not(.glyph),
+    .view-b .nav-title {
+      display: none;
+    }
+
+    .view-b .metrics {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .view-b .content-grid {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 14px;
+      height: 100%;
+    }
+
+    .view-b .right-rail {
+      padding: 18px;
+      background: var(--content);
+      border-left: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .view-c .layout {
+      grid-template-columns: 280px minmax(0, 1fr);
+    }
+
+    .view-c .content {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .view-c .metrics {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .view-c .dense-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+      grid-template-rows: minmax(0, 1fr) 180px;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .view-c .span-row {
+      grid-column: 1 / -1;
+    }
+
+    .view-d .layout {
+      grid-template-columns: 238px minmax(0, 1fr);
+    }
+
+    .view-d .content {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .view-d .glass-grid {
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) 320px;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .view-e .layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .view-e .content {
+      padding: 20px;
+    }
+
+    .view-e .bento-grid {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr) 330px;
+      grid-template-rows: 190px 256px minmax(0, 1fr);
+      gap: 14px;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .view-e .hero-status {
+      grid-column: 1 / 3;
+    }
+
+    .view-e .tall {
+      grid-row: span 2;
+    }
+
+    .view-f .layout {
+      grid-template-columns: 244px minmax(0, 1fr) 330px;
+    }
+
+    .view-f .content {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .view-f .ops-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      grid-template-rows: minmax(0, 1fr) 205px;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .right-status {
+      padding: 18px;
+      border-left: 1px solid var(--line);
+      background: var(--content);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      min-height: 0;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 68%;
+      background: var(--primary);
+    }
+
+    .mini-chart {
+      height: 86px;
+      display: flex;
+      align-items: flex-end;
+      gap: 9px;
+      padding: 10px 4px 0;
+    }
+
+    .mini-chart span {
+      flex: 1;
+      border-radius: 6px 6px 0 0;
+      background: var(--primary);
+      opacity: .78;
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const concepts = [
+      { id: "light", title: "方案 01 明亮效率台", theme: "concept-light view-a" },
+      { id: "dark", title: "方案 02 暗色流光中控", theme: "concept-dark view-b" },
+      { id: "dense", title: "方案 03 专业密集桌面", theme: "concept-dense view-c" },
+      { id: "glass", title: "方案 04 晨雾玻璃面板", theme: "concept-glass view-d" },
+      { id: "bento", title: "方案 05 模块化看板", theme: "concept-bento view-e" },
+      { id: "command", title: "方案 06 运维指挥台", theme: "concept-command view-f" }
+    ];
+
+    const metrics = [
+      ["监控", "6 个"],
+      ["抓取", "10 条"],
+      ["巡检", "每 12 小时"],
+      ["请求", "15 - 25 秒"],
+      ["消息", "1.5 秒"],
+      ["Cookie", "浏览器优先"]
+    ];
+
+    const targets = [
+      ["影视飓风", "UID 946974"],
+      ["科技美学", "UID 3766866"],
+      ["老师好我叫何同学", "UID 163637592"],
+      ["差评君", "UID 19319172"],
+      ["极客湾", "UID 25876945"]
+    ];
+
+    const logs = [
+      ["立即检查投稿完成", "23:18"],
+      ["发现 2 条新增投稿，已推送到 Telegram", "23:17"],
+      ["读取浏览器 Cookie 成功", "23:12"],
+      ["配置已自动保存", "23:09"],
+      ["下次巡检将在 12 小时后执行", "23:08"]
+    ];
+
+    const nav = `
+      <div class="nav-group">
+        <div class="nav-title">工作台</div>
+        <div class="nav-item active"><span class="glyph">总</span><span>总览</span></div>
+        <div class="nav-item"><span class="glyph">UP</span><span>UP 监控</span></div>
+        <div class="nav-item"><span class="glyph">T</span><span>Telegram</span></div>
+        <div class="nav-item"><span class="glyph">C</span><span>Cookie</span></div>
+        <div class="nav-title">系统</div>
+        <div class="nav-item"><span class="glyph">志</span><span>运行日志</span></div>
+        <div class="nav-item"><span class="glyph">设</span><span>高级设置</span></div>
+      </div>
+    `;
+
+    function topbar(extra = "") {
+      return `
+        <div class="topbar">
+          <div class="brand">
+            <div class="brand-mark">B</div>
+            <div class="brand-title">
+              <strong>PushToBili</strong>
+              <span>B 站投稿提醒工具</span>
+            </div>
+          </div>
+          <div class="top-actions">
+            <div class="search">搜索 UP、UID、日志</div>
+            <div class="status-pill"><span class="dot"></span>本地服务已连接</div>
+            ${extra}
+          </div>
+        </div>
+      `;
+    }
+
+    function metricsHtml(count = 6) {
+      return `<div class="metrics">${metrics.slice(0, count).map(([k, v]) => `
+        <div class="metric"><span>${k}</span><strong>${v}</strong></div>
+      `).join("")}</div>`;
+    }
+
+    function actionsHtml() {
+      return `
+        <div class="quick-actions">
+          <button class="primary-btn">立即检查投稿</button>
+          <button class="secondary-btn">测试 Telegram</button>
+          <button class="ghost-btn">读取浏览器 Cookie</button>
+          <button class="ghost-btn">导出配置</button>
+        </div>
+      `;
+    }
+
+    function targetList(limit = 5) {
+      return `<div class="stack">${targets.slice(0, limit).map((item, index) => `
+        <div class="target-row">
+          <div class="avatar">${index + 1}</div>
+          <div class="main-text"><strong>${item[0]}</strong><span>${item[1]} · 最近 2 小时内检查</span></div>
+          <div class="chip">启用</div>
+        </div>
+      `).join("")}</div>`;
+    }
+
+    function logsHtml(limit = 5) {
+      return `<div class="stack">${logs.slice(0, limit).map(([text, time]) => `
+        <div class="log-row">
+          <span class="log-pin"></span>
+          <span>${text}</span>
+          <span class="meta">${time}</span>
+        </div>
+      `).join("")}</div>`;
+    }
+
+    function telegramPanel() {
+      return `
+        <div class="panel">
+          <div class="panel-head"><h3>Telegram 推送</h3><span class="chip">已配置</span></div>
+          <div class="panel-body">
+            <div class="field-grid">
+              <div class="field"><span class="label">Bot Token</span><div class="input">123456:******</div></div>
+              <div class="field"><span class="label">Chat ID</span><div class="input">-1001234567890</div></div>
+              <div class="field" style="grid-column: 1 / -1"><span class="label">消息前缀</span><div class="input">B站投稿更新提醒</div></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function cookiePanel() {
+      return `
+        <div class="panel">
+          <div class="panel-head"><h3>B 站 Cookie</h3><span class="chip">浏览器优先</span></div>
+          <div class="panel-body">
+            <div class="textarea">SESSDATA=******; bili_jct=******; DedeUserID=******; 当前会优先读取浏览器 Cookie，手动 Cookie 作为兜底。</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function settingsList() {
+      const rows = [
+        ["自动检查间隔", "12 小时"],
+        ["每次抓取条数", "10 条"],
+        ["首轮同步条数", "10 条"],
+        ["请求最小间隔", "15 秒"],
+        ["请求最大间隔", "25 秒"],
+        ["消息发送间隔", "1.5 秒"]
+      ];
+      return `<div class="stack">${rows.map(([k, v]) => `
+        <div class="config-row"><span>${k}</span><strong>${v}</strong></div>
+      `).join("")}</div>`;
+    }
+
+    function compactPushPanel(title = "推送与 Cookie") {
+      return `
+        <div class="panel">
+          <div class="panel-head"><h3>${title}</h3><span class="chip">已连接</span></div>
+          <div class="panel-body">
+            <div class="field-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+              <div class="field"><span class="label">Bot Token</span><div class="mini-input">123456:******</div></div>
+              <div class="field"><span class="label">Chat ID</span><div class="mini-input">-1001234567890</div></div>
+              <div class="field"><span class="label">消息前缀</span><div class="mini-input">B站投稿更新提醒</div></div>
+              <div class="field" style="grid-column: 1 / -1"><span class="label">B 站 Cookie</span><div class="textarea" style="height: 58px;">SESSDATA=******; bili_jct=******; 当前会优先读取浏览器 Cookie，手动 Cookie 作为兜底。</div></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function compactExportPanel() {
+      return `
+        <div class="panel">
+          <div class="panel-head"><h3>Cookie 与导出</h3><button class="secondary-btn">选择目录</button></div>
+          <div class="panel-body">
+            <div class="field-grid" style="grid-template-columns: 1.1fr .9fr;">
+              <div class="field"><span class="label">B 站 Cookie</span><div class="textarea" style="height: 78px;">SESSDATA=******; bili_jct=******; 当前会优先读取浏览器 Cookie，手动 Cookie 作为兜底。</div></div>
+              <div class="field"><span class="label">导出文件</span><div class="input">PushToBili_exportConfig_2026-07-06 00_08_00.json</div><p class="small-note">导出成功后会轻提示：配置已导出到指定位置。</p></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function compactRhythmPanel() {
+      return `
+        <div class="panel">
+          <div class="panel-head"><h3>抓取节奏</h3><span class="chip">自动</span></div>
+          <div class="panel-body">
+            <div class="field-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+              <div class="field"><span class="label">巡检</span><div class="mini-input">12h</div></div>
+              <div class="field"><span class="label">抓取</span><div class="mini-input">10</div></div>
+              <div class="field"><span class="label">请求</span><div class="mini-input">15-25s</div></div>
+              <div class="field"><span class="label">消息间隔</span><div class="mini-input">1.5 秒</div></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function logPanel(title = "运行日志") {
+      return `
+        <div class="panel" style="height: 100%">
+          <div class="panel-head"><h3>${title}</h3><button class="icon-btn">刷</button></div>
+          <div class="panel-body">${logsHtml()}</div>
+        </div>
+      `;
+    }
+
+    function targetPanel(title = "UP 主监控") {
+      return `
+        <div class="panel" style="height: 100%">
+          <div class="panel-head"><h3>${title}</h3><button class="secondary-btn">添加 UP</button></div>
+          <div class="panel-body">${targetList()}</div>
+        </div>
+      `;
+    }
+
+    function hero(copy = "已连接本地服务，等待下一次巡检") {
+      return `
+        <div class="hero-status">
+          <div>
+            <h2>今日监控运行正常</h2>
+            <p>${copy}。新增投稿会自动去重并推送到 Telegram 群组。</p>
+          </div>
+          <div class="big-number">6</div>
+        </div>
+      `;
+    }
+
+    function conceptLight() {
+      return `
+        <div class="artboard concept-light view-a">
+          <div class="window">
+            ${topbar('<button class="primary-btn">立即检查</button><button class="icon-btn">设</button>')}
+            <div class="layout">
+              <aside class="nav">${nav}</aside>
+              <main class="content">
+                <div class="main-grid">
+                  ${hero("监控列表、Cookie、Telegram 和导出配置集中在一个轻量工作台")}
+                  <div class="work-grid">
+                    ${targetPanel()}
+                    <div class="stack">${telegramPanel()}${cookiePanel()}</div>
+                  </div>
+                  <div class="side-stack">
+                    <div class="panel"><div class="panel-head"><h3>快捷动作</h3></div><div class="panel-body">${actionsHtml()}</div></div>
+                    ${logPanel()}
+                  </div>
+                </div>
+              </main>
+            </div>
+          </div>
+          <div class="toast"><span class="dot"></span>配置已导出到指定位置</div>
+          <div class="mode-name">方案 01 明亮效率台</div>
+        </div>
+      `;
+    }
+
+    function conceptDark() {
+      return `
+        <div class="artboard concept-dark view-b">
+          <div class="window">
+            ${topbar('<button class="primary-btn">开始巡检</button>')}
+            <div class="layout">
+              <aside class="nav">${nav}</aside>
+              <main class="content">
+                <div class="content-grid">
+                  <div class="section-head">
+                    <div><h1>投稿监控中控台</h1><p>暗色界面适合长时间挂在桌面，重点状态更醒目。</p></div>
+                    <div class="top-actions"><button class="secondary-btn">导出配置</button><button class="ghost-btn">管理参数</button></div>
+                  </div>
+                  ${metricsHtml(6)}
+                  <div class="two-col">
+                    ${targetPanel("监控队列")}
+                    <div class="stack">${telegramPanel()}${cookiePanel()}</div>
+                  </div>
+                </div>
+              </main>
+              <aside class="right-rail">
+                ${hero("当前 0 个错误，最近一次推送成功")}
+                ${logPanel("事件流")}
+                <div class="panel"><div class="panel-head"><h3>发送节奏</h3></div><div class="panel-body"><div class="progress"><span></span></div><p class="small-note">请求间隔 15 - 25 秒，消息间隔 1.5 秒。</p></div></div>
+              </aside>
+            </div>
+          </div>
+          <div class="mode-name">方案 02 暗色流光中控</div>
+        </div>
+      `;
+    }
+
+    function conceptDense() {
+      return `
+        <div class="artboard concept-dense view-c">
+          <div class="window">
+            ${topbar('<button class="primary-btn">立即检查投稿</button><button class="ghost-btn">导出配置</button>')}
+            <div class="layout">
+              <aside class="nav">${nav}<div style="height:18px"></div><div class="panel"><div class="panel-head"><h3>当前状态</h3></div><div class="panel-body"><div class="status-pill"><span class="dot"></span>待命</div><p class="small-note">保存 18 次 · 今日推送 2 条</p></div></div></aside>
+              <main class="content">
+                <div class="section-head">
+                  <div><h1>专业桌面控制台</h1><p>信息密度高，适合频繁检查、批量管理和排查日志。</p></div>
+                  <div class="top-actions"><button class="secondary-btn">测试 Telegram</button><button class="ghost-btn">读取 Cookie</button></div>
+                </div>
+                ${metricsHtml(5)}
+                <div class="dense-grid">
+                  <div class="panel">
+                    <div class="panel-head"><h3>UP 主列表</h3><button class="secondary-btn">添加</button></div>
+                    <div class="panel-body" style="padding:0">
+                      <table class="table">
+                        <thead><tr><th>名称</th><th>UID</th><th>最近检查</th><th>状态</th><th>操作</th></tr></thead>
+                        <tbody>
+                          <tr><td>影视飓风</td><td>946974</td><td>23:17</td><td>启用</td><td>编辑</td></tr>
+                          <tr><td>科技美学</td><td>3766866</td><td>23:16</td><td>启用</td><td>编辑</td></tr>
+                          <tr><td>何同学</td><td>163637592</td><td>23:15</td><td>启用</td><td>编辑</td></tr>
+                          <tr><td>差评君</td><td>19319172</td><td>23:14</td><td>启用</td><td>编辑</td></tr>
+                          <tr><td>极客湾</td><td>25876945</td><td>23:13</td><td>启用</td><td>编辑</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  ${logPanel()}
+                  <div class="panel span-row"><div class="panel-head"><h3>参数与推送</h3><button class="primary-btn">保存设置</button></div><div class="panel-body"><div class="field-grid" style="grid-template-columns: repeat(6, minmax(0, 1fr));"><div class="field"><span class="label">自动检查</span><div class="mini-input">12 小时</div></div><div class="field"><span class="label">抓取条数</span><div class="mini-input">10 条</div></div><div class="field"><span class="label">首轮同步</span><div class="mini-input">10 条</div></div><div class="field"><span class="label">请求间隔</span><div class="mini-input">15 - 25 秒</div></div><div class="field"><span class="label">消息间隔</span><div class="mini-input">1.5 秒</div></div><div class="field"><span class="label">Cookie</span><div class="mini-input">浏览器优先</div></div></div></div></div>
+                </div>
+              </main>
+            </div>
+          </div>
+          <div class="mode-name">方案 03 专业密集桌面</div>
+        </div>
+      `;
+    }
+
+    function conceptGlass() {
+      return `
+        <div class="artboard concept-glass view-d">
+          <div class="window">
+            ${topbar('<button class="primary-btn">立即检查投稿</button><button class="icon-btn">设</button>')}
+            <div class="layout">
+              <aside class="nav">${nav}<div style="height:16px"></div><div class="panel"><div class="panel-head"><h3>导出目录</h3></div><div class="panel-body"><div class="input">D:\\@Software\\PushToBili</div></div></div></aside>
+              <main class="content">
+                <div class="section-head">
+                  <div><h1>晨雾玻璃面板</h1><p>保留轻盈感，但减少杂乱装饰，适合偏现代的桌面小工具。</p></div>
+                  <div class="top-actions"><button class="secondary-btn">读取 Cookie</button><button class="ghost-btn">导出配置</button></div>
+                </div>
+                ${metricsHtml(6)}
+                <div class="glass-grid">
+                  <div class="stack">${hero("自动巡检已开启，推送链路稳定")}<div class="panel"><div class="panel-head"><h3>快捷动作</h3></div><div class="panel-body">${actionsHtml()}</div></div></div>
+                  ${targetPanel()}
+                  <div class="stack">${telegramPanel()}${logPanel()}</div>
+                </div>
+              </main>
+            </div>
+          </div>
+          <div class="drawer">
+            <h2>高级设置</h2>
+            ${settingsList()}
+          </div>
+          <div class="mode-name">方案 04 晨雾玻璃面板</div>
+        </div>
+      `;
+    }
+
+    function conceptBento() {
+      return `
+        <div class="artboard concept-bento view-e">
+          <div class="window">
+            ${topbar('<button class="primary-btn">立即检查投稿</button><button class="ghost-btn">管理参数</button>')}
+            <div class="layout">
+              <main class="content">
+                <div class="bento-grid">
+                  ${hero("用大块状态面板讲清当前运行情况，其他模块围绕它组织")}
+                  <div class="panel"><div class="panel-head"><h3>今日结果</h3><span class="chip">2 条新增</span></div><div class="panel-body"><div class="mini-chart"><span style="height:42%"></span><span style="height:72%"></span><span style="height:50%"></span><span style="height:82%"></span><span style="height:64%"></span><span style="height:36%"></span></div><p class="small-note">自动去重后，已推送到 Telegram。</p></div></div>
+                  <div class="panel tall"><div class="panel-head"><h3>快捷动作</h3></div><div class="panel-body">${actionsHtml()}<div style="height:12px"></div>${settingsList()}</div></div>
+                  ${targetPanel("监控对象")}
+                  ${compactPushPanel("推送与 Cookie")}
+                  <div class="panel" style="height: 100%"><div class="panel-head"><h3>最近动态</h3><button class="icon-btn">刷</button></div><div class="panel-body">${logsHtml(4)}</div></div>
+                </div>
+              </main>
+            </div>
+          </div>
+          <div class="mode-name">方案 05 模块化看板</div>
+        </div>
+      `;
+    }
+
+    function conceptCommand() {
+      return `
+        <div class="artboard concept-command view-f">
+          <div class="window">
+            ${topbar('<button class="primary-btn">立即检查投稿</button>')}
+            <div class="layout">
+              <aside class="nav">${nav}</aside>
+              <main class="content">
+                <div class="section-head">
+                  <div><h1>运维指挥台</h1><p>左侧导航深色压住视觉重心，中心区域专注任务处理。</p></div>
+                  <div class="top-actions"><button class="secondary-btn">测试 Telegram</button><button class="ghost-btn">导出配置</button></div>
+                </div>
+                ${metricsHtml(6)}
+                <div class="ops-grid">
+                  ${targetPanel("监控任务")}
+                  <div class="stack">${telegramPanel()}${compactRhythmPanel()}</div>
+                  <div style="grid-column: 1 / -1">${compactExportPanel()}</div>
+                </div>
+              </main>
+              <aside class="right-status">
+                ${hero("当前服务健康，最近一次推送成功")}
+                ${logPanel("实时日志")}
+                <div class="panel"><div class="panel-head"><h3>连接</h3><span class="chip">正常</span></div><div class="panel-body"><p class="small-note">后端端口 18765 · 自动保存开启 · 本地历史库可用。</p></div></div>
+              </aside>
+            </div>
+          </div>
+          <div class="mode-name">方案 06 运维指挥台</div>
+        </div>
+      `;
+    }
+
+    const renderers = {
+      light: conceptLight,
+      dark: conceptDark,
+      dense: conceptDense,
+      glass: conceptGlass,
+      bento: conceptBento,
+      command: conceptCommand
+    };
+
+    const params = new URLSearchParams(location.search);
+    const selected = params.get("concept") || "gallery";
+    const app = document.getElementById("app");
+
+    if (selected === "gallery") {
+      document.body.className = "gallery";
+      app.innerHTML = `<div class="gallery-grid">${concepts.map((concept) => `
+        <section class="gallery-item">
+          <h2>${concept.title}</h2>
+          ${renderers[concept.id]()}
+        </section>
+      `).join("")}</div>`;
+    } else {
+      document.body.className = "single";
+      app.innerHTML = renderers[selected] ? renderers[selected]() : conceptLight();
+    }
+  </script>
+</body>
+</html>

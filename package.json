@@ -1,0 +1,31 @@
+{
+  "name": "push-to-bili-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Single-process desktop app for Bilibili upload monitor and Telegram push.",
+  "main": "app.py",
+  "type": "module",
+  "scripts": {
+    "dev": "python app.py",
+    "build:pyqt": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& '.\\\\.venv\\\\Scripts\\\\pyinstaller.exe' 'PushToBili.spec'\"",
+    "dist": "npm run build:pyqt"
+  },
+  "dependencies": {
+    "lucide-react": "^0.554.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.4",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "wait-on": "^9.0.3"
+  }
+}
