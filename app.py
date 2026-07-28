@@ -7,10 +7,25 @@ import re
 import sys
 from dataclasses import asdict
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, QThread, QTimer, Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QColor, QFont, QIcon, QResizeEvent, QTextCharFormat, QTextCursor
+from pypinyin import Style, lazy_pinyin
+
+from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QRectF, QCoreApplication, QThread, QTimer, Qt, Signal
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QColor,
+    QFont,
+    QIcon,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QResizeEvent,
+    QTextCharFormat,
+    QTextCursor,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -19,7 +34,6 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFrame,
-    QGraphicsDropShadowEffect,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
@@ -50,11 +64,25 @@ from store import SentVideoStore
 
 APP_WINDOW_TITLE = "PushToBilibili"
 TRAY_TOOLTIP = "PushToBilibili - 抓取推送到tg"
+APP_USER_MODEL_ID = "PushToTelegram.PushToBilibili"
+
+
+@lru_cache(maxsize=2048)
+def build_search_index(text: str) -> str:
+    """Build a cached Chinese, full-pinyin and initial-letter search index."""
+    normalized = text.casefold()
+    full_pinyin = "".join(lazy_pinyin(normalized))
+    initials = "".join(lazy_pinyin(normalized, style=Style.FIRST_LETTER))
+    return f"{normalized} {full_pinyin} {initials}"
 
 
 def enable_high_dpi() -> None:
     if sys.platform != "win32":
         return
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+    except Exception:
+        pass
     try:
         ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
     except Exception:
@@ -159,6 +187,76 @@ class LogListWidget(QListWidget):
         self.scrollToBottom()
 
 
+class NavIcon(QWidget):
+    """Small native vector icon used by the sidebar navigation."""
+
+    def __init__(self, icon_name: str, *, active: bool = False) -> None:
+        super().__init__()
+        self.icon_name = icon_name
+        self.active = active
+        self.setFixedSize(32, 32)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+    def set_active(self, active: bool) -> None:
+        if self.active != active:
+            self.active = active
+            self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        del event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        background = QColor("#3b6df6" if self.active else "#172846")
+        foreground = QColor("#ffffff" if self.active else "#9fb1cc")
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(background)
+        painter.drawRoundedRect(QRectF(0, 0, 32, 32), 9, 9)
+
+        pen = QPen(foreground, 1.8)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        if self.icon_name == "overview":
+            for rect in (
+                QRectF(8, 8, 6, 6),
+                QRectF(18, 8, 6, 6),
+                QRectF(8, 18, 6, 6),
+                QRectF(18, 18, 6, 6),
+            ):
+                painter.drawRoundedRect(rect, 1.5, 1.5)
+        elif self.icon_name == "up":
+            painter.drawEllipse(QRectF(13, 8, 6, 6))
+            painter.drawRoundedRect(QRectF(8.5, 17, 15, 7), 3.5, 3.5)
+        elif self.icon_name == "telegram":
+            path = QPainterPath(QPointF(7.5, 15.2))
+            path.lineTo(24.2, 8.2)
+            path.lineTo(18.5, 24)
+            path.lineTo(14.8, 18.2)
+            path.closeSubpath()
+            painter.drawPath(path)
+            painter.drawLine(QPointF(14.8, 18.2), QPointF(20.8, 11.7))
+        elif self.icon_name == "cookie":
+            painter.drawEllipse(QRectF(8, 8, 16, 16))
+            painter.drawEllipse(QRectF(12, 12, 1.2, 1.2))
+            painter.drawEllipse(QRectF(17.8, 13.7, 1.2, 1.2))
+            painter.drawEllipse(QRectF(14.6, 18.6, 1.2, 1.2))
+        elif self.icon_name == "log":
+            for y in (10.5, 16, 21.5):
+                painter.drawEllipse(QRectF(8, y - 1, 2, 2))
+                painter.drawLine(QPointF(13, y), QPointF(24, y))
+        elif self.icon_name == "settings":
+            for y, knob_x in ((10.5, 18), (16, 13), (21.5, 20.5)):
+                painter.drawLine(QPointF(8, y), QPointF(24, y))
+                painter.setBrush(background)
+                painter.drawEllipse(QRectF(knob_x - 2, y - 2, 4, 4))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        painter.end()
+
+
 class StepperField(QWidget):
     valueChanged = Signal(float)
 
@@ -251,8 +349,8 @@ class BiliPulseWindow(QMainWindow):
         self.config_autosave_timer.timeout.connect(self._save_config_silent)
 
         self.setWindowTitle(APP_WINDOW_TITLE)
-        self.setMinimumSize(1260, 860)
-        self.resize(1450, 940)
+        self.setMinimumSize(1240, 820)
+        self.resize(1480, 940)
         self.setWindowIcon(QIcon(str(self.icon_path)))
 
         self._build_ui()
@@ -272,38 +370,38 @@ class BiliPulseWindow(QMainWindow):
         self.setCentralWidget(root)
 
         shell = QVBoxLayout(root)
-        shell.setContentsMargins(18, 18, 18, 18)
-        shell.setSpacing(0)
+        shell.setContentsMargins(16, 16, 16, 16)
+        shell.setSpacing(14)
 
         shell.addWidget(self._build_topbar(), 0)
 
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
-        body.setSpacing(0)
+        body.setSpacing(14)
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(340)
+        sidebar.setFixedWidth(258)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(20, 22, 20, 22)
-        sidebar_layout.setSpacing(18)
+        sidebar_layout.setContentsMargins(14, 18, 14, 16)
+        sidebar_layout.setSpacing(12)
         sidebar_layout.addWidget(self._build_sidebar_nav())
-        sidebar_layout.addWidget(self._build_sidebar_notes())
         sidebar_layout.addStretch(1)
+        sidebar_layout.addWidget(self._build_sidebar_notes())
 
         self.main_scroll = QScrollArea()
         self.main_scroll.setObjectName("mainScroll")
         self.main_scroll.setWidgetResizable(True)
         self.main_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         main_host = QWidget()
         main_host.setObjectName("mainScrollHost")
         self.main_scroll.setWidget(main_host)
 
         main_layout = QVBoxLayout(main_host)
-        main_layout.setContentsMargins(26, 24, 26, 24)
+        main_layout.setContentsMargins(0, 0, 2, 4)
         main_layout.setSpacing(14)
         main_layout.addWidget(self._build_metrics_panel())
 
@@ -312,8 +410,8 @@ class BiliPulseWindow(QMainWindow):
         workspace.setSpacing(18)
         self.source_card = self._build_source_card()
         self.log_card = self._build_log_card()
-        self.source_card.setMinimumHeight(480)
-        self.log_card.setMinimumHeight(480)
+        self.source_card.setMinimumHeight(440)
+        self.log_card.setMinimumHeight(440)
         workspace.addWidget(self.source_card, 3)
         workspace.addWidget(self.log_card, 2)
         main_layout.addLayout(workspace, 1)
@@ -332,8 +430,8 @@ class BiliPulseWindow(QMainWindow):
         bar.setObjectName("topbar")
         self._apply_shadow(bar)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(26, 14, 26, 14)
-        layout.setSpacing(18)
+        layout.setContentsMargins(18, 10, 18, 10)
+        layout.setSpacing(14)
 
         brand = QWidget()
         brand.setObjectName("topbarBrand")
@@ -343,8 +441,8 @@ class BiliPulseWindow(QMainWindow):
 
         mark = QLabel()
         mark.setObjectName("topbarMark")
-        mark.setFixedSize(52, 52)
-        mark.setText("B")
+        mark.setFixedSize(46, 46)
+        mark.setPixmap(QIcon(str(self.icon_path)).pixmap(42, 42))
         mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         text_wrap = QVBoxLayout()
@@ -365,8 +463,8 @@ class BiliPulseWindow(QMainWindow):
 
         self.search_edit = QLineEdit()
         self.search_edit.setObjectName("searchEdit")
-        self.search_edit.setPlaceholderText("搜索 UP、UID、日志")
-        self.search_edit.setFixedWidth(340)
+        self.search_edit.setPlaceholderText("搜索 UP、UID、拼音或首字母")
+        self.search_edit.setFixedWidth(290)
         self.search_edit.textChanged.connect(self._apply_search_filter)
 
         actions = QHBoxLayout()
@@ -375,9 +473,9 @@ class BiliPulseWindow(QMainWindow):
         self.top_check_button = self._button("立即检查投稿", "primary", self.check_updates)
         self.retry_send_button = self._button("重试发送", "warm", self.retry_pending_send)
         self.export_button = self._button("导出配置", "soft", self.export_config)
-        self.top_check_button.setMinimumWidth(150)
-        self.retry_send_button.setMinimumWidth(118)
-        self.export_button.setMinimumWidth(112)
+        self.top_check_button.setMinimumWidth(142)
+        self.retry_send_button.setMinimumWidth(108)
+        self.export_button.setMinimumWidth(104)
         actions.addWidget(self.top_check_button)
         actions.addWidget(self.retry_send_button)
         actions.addWidget(self.export_button)
@@ -423,7 +521,7 @@ class BiliPulseWindow(QMainWindow):
         nav = self._sidebar_card("工作台")
         nav.setObjectName("navCard")
         nav.layout().setSpacing(8)
-        self.nav_items: dict[str, tuple[QPushButton, QLabel, QLabel]] = {}
+        self.nav_items: dict[str, tuple[QPushButton, NavIcon, QLabel]] = {}
         for nav_key, key, label, active, handler in (
             ("overview", "总", "总览", True, self._show_overview_section),
             ("up", "UP", "UP 监控", False, self._show_up_section),
@@ -453,18 +551,14 @@ class BiliPulseWindow(QMainWindow):
         layout.setContentsMargins(12, 9, 12, 9)
         layout.setSpacing(10)
 
-        badge = QLabel(key)
-        badge.setObjectName("navBadgeActive" if active else "navBadge")
-        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        badge.setFixedSize(28, 28)
-        badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        icon = NavIcon(nav_key, active=active)
 
         label = QLabel(text)
         label.setObjectName("navTextActive" if active else "navText")
         label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        layout.addWidget(badge, 0)
+        layout.addWidget(icon, 0)
         layout.addWidget(label, 1)
-        self.nav_items[nav_key] = (item, badge, label)
+        self.nav_items[nav_key] = (item, icon, label)
         item.clicked.connect(lambda checked=False, key=nav_key, action=handler: self._handle_nav_click(key, action))
         return item
 
@@ -475,12 +569,12 @@ class BiliPulseWindow(QMainWindow):
     def _set_nav_active(self, nav_key: str) -> None:
         if not hasattr(self, "nav_items"):
             return
-        for key, (item, badge, label) in self.nav_items.items():
+        for key, (item, icon, label) in self.nav_items.items():
             active = key == nav_key
             item.setObjectName("navItemActive" if active else "navItem")
-            badge.setObjectName("navBadgeActive" if active else "navBadge")
             label.setObjectName("navTextActive" if active else "navText")
-            self._refresh_widget_style(item, badge, label)
+            icon.set_active(active)
+            self._refresh_widget_style(item, label)
 
     def _refresh_widget_style(self, *widgets) -> None:
         for widget in widgets:
@@ -490,7 +584,7 @@ class BiliPulseWindow(QMainWindow):
 
     def _show_overview_section(self) -> None:
         if hasattr(self, "main_scroll"):
-            self.main_scroll.verticalScrollBar().setValue(0)
+            self._animate_scroll_to(0)
 
     def _show_up_section(self) -> None:
         self._scroll_to_main_widget(getattr(self, "source_card", None))
@@ -507,7 +601,20 @@ class BiliPulseWindow(QMainWindow):
 
     def _scroll_to_main_widget(self, widget) -> None:
         if widget is not None and hasattr(self, "main_scroll"):
-            self.main_scroll.ensureWidgetVisible(widget, 24, 24)
+            target = max(0, widget.mapTo(self.main_scroll.widget(), QPointF(0, 0).toPoint()).y() - 14)
+            self._animate_scroll_to(target)
+
+    def _animate_scroll_to(self, target: int) -> None:
+        scroll_bar = self.main_scroll.verticalScrollBar()
+        target = max(scroll_bar.minimum(), min(target, scroll_bar.maximum()))
+        if hasattr(self, "_scroll_animation"):
+            self._scroll_animation.stop()
+        self._scroll_animation = QPropertyAnimation(scroll_bar, b"value", self)
+        self._scroll_animation.setDuration(260)
+        self._scroll_animation.setStartValue(scroll_bar.value())
+        self._scroll_animation.setEndValue(target)
+        self._scroll_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._scroll_animation.start()
 
     def show_telegram_config(self) -> None:
         dialog = QDialog(self)
@@ -682,6 +789,7 @@ class BiliPulseWindow(QMainWindow):
         pill.setObjectName("statusPill")
         pill.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pill.setFixedSize(88, 34)
+        self.status_pill = pill
         self.snapshot_targets = QLabel("监控 0 个目标")
         self.snapshot_targets.setObjectName("statusText")
         self.snapshot_auto = QLabel("自动检查：已关闭")
@@ -697,7 +805,46 @@ class BiliPulseWindow(QMainWindow):
     def _build_metrics_panel(self) -> QWidget:
         panel = QWidget()
         panel.setObjectName("metricsPanel")
-        meta_row = QHBoxLayout(panel)
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(12)
+
+        hero = QFrame()
+        hero.setObjectName("overviewHero")
+        hero_layout = QHBoxLayout(hero)
+        hero_layout.setContentsMargins(24, 18, 22, 18)
+        hero_layout.setSpacing(18)
+
+        hero_copy = QVBoxLayout()
+        hero_copy.setContentsMargins(0, 0, 0, 0)
+        hero_copy.setSpacing(4)
+        eyebrow = QLabel("投稿监控 · 实时工作台")
+        eyebrow.setObjectName("overviewEyebrow")
+        title = QLabel("让每一次更新，都准时抵达")
+        title.setObjectName("overviewTitle")
+        subtitle = QLabel("集中查看监控目标、巡检节奏与推送状态")
+        subtitle.setObjectName("overviewSubtitle")
+        hero_copy.addWidget(eyebrow)
+        hero_copy.addWidget(title)
+        hero_copy.addWidget(subtitle)
+
+        status_wrap = QFrame()
+        status_wrap.setObjectName("overviewStatus")
+        status_layout = QVBoxLayout(status_wrap)
+        status_layout.setContentsMargins(16, 10, 16, 10)
+        status_layout.setSpacing(2)
+        status_label = QLabel("当前状态")
+        status_label.setObjectName("overviewStatusLabel")
+        self.overview_status_value = QLabel("● 系统待命")
+        self.overview_status_value.setObjectName("overviewStatusValue")
+        status_layout.addWidget(status_label)
+        status_layout.addWidget(self.overview_status_value)
+
+        hero_layout.addLayout(hero_copy, 1)
+        hero_layout.addWidget(status_wrap, 0, Qt.AlignmentFlag.AlignVCenter)
+        panel_layout.addWidget(hero)
+
+        meta_row = QHBoxLayout()
         meta_row.setContentsMargins(0, 0, 0, 0)
         meta_row.setSpacing(12)
 
@@ -724,6 +871,7 @@ class BiliPulseWindow(QMainWindow):
         action_layout.addWidget(self.fill_cookie_button)
         self.test_button = self.top_test_button
         meta_row.addWidget(action_bar, 0)
+        panel_layout.addLayout(meta_row)
         return panel
 
     def _build_metric_card(self, label_text: str, value_text: str) -> tuple[QFrame, QLabel]:
@@ -789,6 +937,7 @@ class BiliPulseWindow(QMainWindow):
         self.up_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.up_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.up_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.up_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.up_table.horizontalHeader().setStretchLastSection(False)
         for column in range(5):
             self.up_table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
@@ -916,14 +1065,15 @@ class BiliPulseWindow(QMainWindow):
         title.setObjectName("cardTitle")
         head.addWidget(title)
         head.addStretch(1)
-        self.clear_log_button = self._button("刷", "ghost", self.clear_log_view, compact=True)
-        self.clear_log_button.setFixedWidth(46)
+        self.clear_log_button = self._button("清空", "ghost", self.clear_log_view, compact=True)
+        self.clear_log_button.setFixedWidth(62)
         head.addWidget(self.clear_log_button)
         layout.addLayout(head)
 
         self.log_text = LogListWidget()
         self.log_text.setObjectName("logList")
         self.log_text.setMinimumHeight(380)
+        self.log_text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self.log_text, 1)
         return card
 
@@ -961,12 +1111,10 @@ class BiliPulseWindow(QMainWindow):
 
 
     def _apply_shadow(self, widget) -> None:
-        from PySide6.QtGui import QColor
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 15))
-        shadow.setOffset(0, 4)
-        widget.setGraphicsEffect(shadow)
+        # Effects on container widgets rasterize their children. On Windows with
+        # fractional DPI scaling that also softens text, so depth is drawn with
+        # crisp borders and layered surfaces instead.
+        widget.setGraphicsEffect(None)
 
     def _surface_card(self) -> QFrame:
         frame = QFrame()
@@ -1061,6 +1209,7 @@ class BiliPulseWindow(QMainWindow):
         button = QPushButton(text)
         button.setProperty("styleType", style_name)
         button.setProperty("compact", compact)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.clicked.connect(handler)
         return button
 
@@ -1371,12 +1520,13 @@ class BiliPulseWindow(QMainWindow):
     def _resize_up_table_columns(self) -> None:
         if not hasattr(self, "up_table"):
             return
-        available = max(760, self.up_table.viewport().width() - 14)
-        fixed_recent = 132
-        fixed_status = 86
+        available = max(500, self.up_table.viewport().width() - 2)
+        fixed_recent = 112
+        fixed_status = 74
         fixed_action = self._up_action_column_width()
-        name_width = min(260, max(210, int(available * 0.26)))
-        uid_width = max(210, available - name_width - fixed_recent - fixed_status - fixed_action)
+        flexible = max(250, available - fixed_recent - fixed_status - fixed_action)
+        name_width = max(138, min(235, int(flexible * 0.48)))
+        uid_width = max(112, flexible - name_width)
         for column, width in enumerate((name_width, uid_width, fixed_recent, fixed_status, fixed_action)):
             self.up_table.setColumnWidth(column, width)
 
@@ -1431,8 +1581,9 @@ class BiliPulseWindow(QMainWindow):
                 self.up_table.item(row, column).text()
                 for column in range(self.up_table.columnCount())
                 if self.up_table.item(row, column)
-            ).casefold()
-            self.up_table.setRowHidden(row, bool(keyword and keyword not in row_text))
+            )
+            search_index = build_search_index(row_text)
+            self.up_table.setRowHidden(row, bool(keyword and keyword not in search_index))
 
     def _toggle_cookie_mode(self) -> None:
         self.browser_cookie_checkbox.setChecked(not self.browser_cookie_checkbox.isChecked())
@@ -1487,57 +1638,54 @@ class BiliPulseWindow(QMainWindow):
         self.setStyleSheet(
             f"""
             QWidget#root {{
-                background: #e8eef6;
-                color: #111827;
+                background: #f1f4f9;
+                color: #142033;
                 font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
-                font-size: 14px;
+                font-size: 10pt;
             }}
             QFrame#topbar {{
-                background: #fbfdff;
-                border: 1px solid #d8e0ea;
-                border-radius: 10px;
+                background: #ffffff;
+                border: 1px solid #dfe5ef;
+                border-radius: 14px;
             }}
             QWidget#topbarBrand {{
                 background: transparent;
             }}
             QLabel#topbarMark {{
-                background: #2563eb;
-                border-radius: 9px;
-                color: #ffffff;
-                font-size: 22px;
-                font-weight: 900;
+                background: transparent;
+                border-radius: 11px;
             }}
             QLabel#topbarTitle {{
-                color: #111827;
-                font-size: 20px;
-                font-weight: 900;
-            }}
-            QLabel#topbarSubtitle {{
-                color: #64748b;
-                font-size: 12px;
+                color: #101828;
+                font-size: 15pt;
                 font-weight: 700;
             }}
+            QLabel#topbarSubtitle {{
+                color: #7b879b;
+                font-size: 8.5pt;
+                font-weight: 500;
+            }}
             QLabel#topbarStatus {{
-                background: #e8f8f0;
-                color: #047857;
-                border: 1px solid #c8ead9;
-                border-radius: 8px;
-                padding: 8px 13px;
-                font-size: 13px;
-                font-weight: 800;
+                background: #ecfdf5;
+                color: #087a56;
+                border: 1px solid #c7f0df;
+                border-radius: 9px;
+                padding: 7px 12px;
+                font-size: 9pt;
+                font-weight: 600;
             }}
             QLineEdit#searchEdit {{
-                background: #f8fafc;
-                border: 1px solid #d8e0ea;
-                border-radius: 8px;
-                color: #111827;
+                background: #f6f8fc;
+                border: 1px solid #e0e6f0;
+                border-radius: 10px;
+                color: #142033;
                 padding: 0 14px;
-                min-height: 38px;
-                font-size: 14px;
+                min-height: 36px;
+                font-size: 9.5pt;
             }}
             QLineEdit#searchEdit:focus {{
                 background: #ffffff;
-                border: 1px solid #b9c7d8;
+                border: 1px solid #6e91f8;
             }}
             QScrollArea#mainScroll {{
                 background: transparent;
@@ -1550,19 +1698,19 @@ class BiliPulseWindow(QMainWindow):
                 background: transparent;
             }}
             QFrame#sidebar {{
-                background: #f9fbfe;
-                border: 1px solid #d8e0ea;
-                border-radius: 12px;
+                background: #0c1830;
+                border: none;
+                border-radius: 16px;
             }}
             QFrame#brandCard {{
-                background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 12px;
+                background: #142442;
+                border: 1px solid #24385b;
+                border-radius: 13px;
             }}
             QFrame#sidebarCard {{
-                background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 10px;
+                background: #142442;
+                border: 1px solid #24385b;
+                border-radius: 13px;
             }}
             QFrame#navCard {{
                 background: transparent;
@@ -1570,297 +1718,330 @@ class BiliPulseWindow(QMainWindow):
                 border-radius: 0;
             }}
             QLabel#navSectionLabel {{
-                color: #64748b;
-                font-size: 12px;
-                font-weight: 800;
-                padding: 0 0 4px 0;
+                color: #7083a3;
+                font-size: 8.5pt;
+                font-weight: 600;
+                padding: 4px 10px 5px 10px;
             }}
             QFrame#statusCard {{
-                background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 10px;
+                background: #142442;
+                border: 1px solid #24385b;
+                border-radius: 13px;
             }}
             QLabel#statusPill {{
-                background: #dff8ea;
-                color: #047857;
-                border: 1px solid #bfe8d1;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 900;
+                background: #123b38;
+                color: #6ee7b7;
+                border: 1px solid #1c5b50;
+                border-radius: 9px;
+                font-size: 9.5pt;
+                font-weight: 600;
             }}
             QLabel#statusText {{
-                color: #64748b;
-                font-size: 13px;
-                font-weight: 700;
+                color: #a9b9d2;
+                font-size: 9pt;
+                font-weight: 500;
             }}
             QPushButton#navItem {{
                 background: transparent;
                 border: 1px solid transparent;
-                border-radius: 9px;
+                border-radius: 11px;
                 padding: 0;
-                min-height: 46px;
+                min-height: 48px;
                 text-align: left;
             }}
             QPushButton#navItem:hover {{
-                background: #f2f6fc;
-                border: 1px solid #e3eaf2;
+                background: #122441;
+                border: 1px solid #1c3153;
             }}
             QPushButton#navItem:pressed {{
-                background: #eaf1ff;
-                border: 1px solid #cbdcff;
+                background: #1a2f52;
+                border: 1px solid #29466f;
             }}
             QPushButton#navItem:focus {{
-                border: 1px solid #b9c7d8;
+                border: 1px solid #3d5e91;
             }}
             QPushButton#navItemActive {{
-                background: #eaf1ff;
-                border: 1px solid #cbdcff;
-                border-radius: 9px;
+                background: #192d4d;
+                border: 1px solid #29466f;
+                border-radius: 11px;
                 padding: 0;
-                min-height: 46px;
+                min-height: 48px;
                 text-align: left;
             }}
             QPushButton#navItemActive:hover {{
-                background: #e2ebff;
-            }}
-            QLabel#navBadge, QLabel#navBadgeActive {{
-                border-radius: 7px;
-                font-size: 12px;
-                font-weight: 900;
-            }}
-            QLabel#navBadge {{
-                background: #f2f5f9;
-                color: #64748b;
-            }}
-            QLabel#navBadgeActive {{
-                background: #ffffff;
-                color: #2563eb;
+                background: #203758;
             }}
             QLabel#navText {{
-                color: #334155;
-                font-size: 14px;
-                font-weight: 800;
+                color: #b7c4d8;
+                font-size: 10pt;
+                font-weight: 600;
             }}
             QLabel#navTextActive {{
-                color: #2563eb;
-                font-size: 14px;
-                font-weight: 900;
+                color: #ffffff;
+                font-size: 10pt;
+                font-weight: 600;
             }}
             QLabel#brandMark {{
-                background: #2563eb;
-                border-radius: 10px;
+                background: #3b6df6;
+                border-radius: 11px;
                 padding: 8px;
             }}
             QLabel#brandBadge {{
-                color: #64748b;
-                font-size: 12px;
-                font-weight: 700;
+                color: #8294af;
+                font-size: 8.5pt;
+                font-weight: 500;
             }}
             QLabel#brandTitle {{
-                color: #111827;
-                font-size: 24px;
-                font-weight: 800;
+                color: #ffffff;
+                font-size: 17pt;
+                font-weight: 700;
             }}
             QLabel#sidebarNote, QLabel#metricLabel {{
-                color: #64748b;
-                font-size: 13px;
+                color: #748197;
+                font-size: 9pt;
             }}
             QLabel#sidebarCardTitle {{
-                color: #111827;
-                font-size: 15px;
-                font-weight: 800;
+                color: #ffffff;
+                font-size: 10.5pt;
+                font-weight: 600;
             }}
             QWidget#metricTile {{
-                background: #fbfcfe;
-                border: 1px solid #e7edf4;
-                border-radius: 8px;
+                background: #f8fafc;
+                border: 1px solid #e8edf4;
+                border-radius: 10px;
                 padding: 10px 12px;
             }}
             QLabel#metricValue {{
-                color: #111827;
-                font-size: 17px;
-                font-weight: 800;
+                color: #142033;
+                font-size: 12pt;
+                font-weight: 700;
+            }}
+            QFrame#overviewHero {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #101f3b, stop:0.58 #183460, stop:1 #24578b);
+                border: 1px solid #203e68;
+                border-radius: 14px;
+                min-height: 86px;
+            }}
+            QLabel#overviewEyebrow {{
+                color: #8fb1e7;
+                font-size: 8.5pt;
+                font-weight: 600;
+            }}
+            QLabel#overviewTitle {{
+                color: #ffffff;
+                font-size: 17pt;
+                font-weight: 700;
+            }}
+            QLabel#overviewSubtitle {{
+                color: #b9c9e0;
+                font-size: 9pt;
+                font-weight: 500;
+            }}
+            QFrame#overviewStatus {{
+                background: rgba(8, 22, 43, 145);
+                border: 1px solid rgba(157, 191, 234, 60);
+                border-radius: 11px;
+                min-width: 150px;
+            }}
+            QLabel#overviewStatusLabel {{
+                color: #8ea6c7;
+                font-size: 8pt;
+                font-weight: 500;
+            }}
+            QLabel#overviewStatusValue {{
+                color: #7ce5bd;
+                font-size: 10pt;
+                font-weight: 600;
             }}
             QFrame#surfaceCard, QFrame#summaryBand, QFrame#logCard,
             QFrame#targetCard, QFrame#railCard, QFrame#settingsStrip {{
                 background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 10px;
+                border: 1px solid #dfe5ee;
+                border-radius: 14px;
             }}
             QWidget#heroCard {{
                 background: transparent;
             }}
             QFrame#statusBox {{
-                background: #f7fafc;
-                border: 1px solid #e3eaf2;
-                border-radius: 9px;
+                background: #f7f9fc;
+                border: 1px solid #e6ebf3;
+                border-radius: 11px;
                 min-width: 250px;
             }}
             QFrame#metricCard {{
                 background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 9px;
-                min-height: 66px;
+                border: 1px solid #dfe5ee;
+                border-radius: 12px;
+                min-height: 68px;
             }}
             QLabel#metricCardLabel {{
-                color: #64748b;
-                font-size: 12px;
-                font-weight: 800;
+                color: #748197;
+                font-size: 8.5pt;
+                font-weight: 600;
             }}
             QLabel#metricCardValue {{
-                color: #111827;
-                font-size: 17px;
-                font-weight: 900;
+                color: #142033;
+                font-size: 12.5pt;
+                font-weight: 700;
             }}
             QFrame#cookieBlock {{
-                background: #fbfcfe;
-                border: 1px solid #e7edf4;
-                border-radius: 10px;
+                background: #f8fafc;
+                border: 1px solid #e6ebf3;
+                border-radius: 12px;
             }}
             QLabel#sectionEyebrow {{
-                color: #64748b;
-                font-size: 12px;
-                font-weight: 800;
+                color: #748197;
+                font-size: 8.5pt;
+                font-weight: 600;
             }}
             QLabel#headerTitle {{
-                color: #111827;
-                font-size: 30px;
-                font-weight: 900;
+                color: #142033;
+                font-size: 21pt;
+                font-weight: 700;
             }}
             QLabel#headerSubtitle, QLabel#cardDesc, QLabel#mutedText, QLabel#cardHint {{
-                color: #64748b;
-                font-size: 13px;
+                color: #748197;
+                font-size: 9pt;
             }}
             QLabel#cardTitle {{
-                color: #111827;
-                font-size: 18px;
-                font-weight: 800;
+                color: #142033;
+                font-size: 12.5pt;
+                font-weight: 700;
             }}
             QLabel#fieldLabel {{
-                color: #64748b;
-                font-size: 12px;
-                font-weight: 800;
+                color: #748197;
+                font-size: 8.5pt;
+                font-weight: 600;
             }}
             QLabel#summaryHero {{
-                color: #111827;
-                font-size: 17px;
-                font-weight: 800;
+                color: #142033;
+                font-size: 12pt;
+                font-weight: 700;
             }}
             QDialog#configDialog {{
-                background: #f8fafc;
+                background: #f3f6fa;
             }}
             QFrame#configDialogPanel {{
                 background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 10px;
+                border: 1px solid #dfe5ee;
+                border-radius: 13px;
             }}
             QLabel#dialogTitle {{
-                color: #111827;
-                font-size: 20px;
-                font-weight: 900;
+                color: #142033;
+                font-size: 15pt;
+                font-weight: 700;
             }}
             QLabel#dialogDesc {{
-                color: #64748b;
-                font-size: 13px;
-                font-weight: 600;
+                color: #748197;
+                font-size: 9pt;
+                font-weight: 500;
             }}
             QTableWidget#upTable {{
                 background: #ffffff;
                 border: none;
-                border-top: 1px solid #e5eaf1;
-                color: #334155;
+                border-top: 1px solid #e8edf4;
+                color: #24324a;
                 alternate-background-color: #ffffff;
-                selection-background-color: #eef4ff;
-                selection-color: #111827;
+                selection-background-color: #edf3ff;
+                selection-color: #142033;
                 gridline-color: transparent;
                 outline: none;
-                font-size: 14px;
+                font-size: 9.5pt;
             }}
             QTableWidget#upTable::item {{
-                border-bottom: 1px solid #edf2f7;
+                border-bottom: 1px solid #edf0f5;
                 padding: 0 12px;
             }}
+            QTableWidget#upTable::item:hover {{
+                background: #f7f9fd;
+            }}
             QTableWidget#upTable::item:selected {{
-                background: #f3f7ff;
-                color: #111827;
-                border-bottom: 1px solid #edf2f7;
+                background: #edf3ff;
+                color: #142033;
+                border-bottom: 1px solid #dbe6fb;
             }}
             QTableWidget#upTable::item:focus {{
                 outline: none;
                 border: none;
-                border-bottom: 1px solid #edf2f7;
+                border-bottom: 1px solid #dbe6fb;
             }}
             QWidget#tableActionCell {{
                 background: transparent;
             }}
             QPushButton#tableActionButton {{
                 background: transparent;
-                color: #2563eb;
+                color: #3567e8;
                 border: 1px solid transparent;
-                border-radius: 7px;
+                border-radius: 8px;
                 padding: 0 9px;
                 min-height: 30px;
                 max-height: 30px;
                 min-width: 52px;
-                font-size: 13px;
-                font-weight: 700;
+                font-size: 9pt;
+                font-weight: 600;
             }}
             QPushButton#tableActionButton:hover {{
-                background: #edf4ff;
-                color: #1d4ed8;
-                border: 1px solid #cbdcff;
+                background: #edf3ff;
+                color: #2855cc;
+                border: 1px solid #cedcfc;
             }}
             QPushButton#tableActionButton:pressed {{
-                background: #dfeaff;
-                color: #1d4ed8;
+                background: #dfe8ff;
+                color: #2855cc;
             }}
             QHeaderView::section {{
-                background: #ffffff;
-                color: #64748b;
+                background: #f8fafc;
+                color: #6f7d92;
                 border: none;
-                border-bottom: 1px solid #e5eaf1;
+                border-bottom: 1px solid #e6ebf3;
                 padding: 10px 12px;
-                font-size: 13px;
-                font-weight: 800;
+                font-size: 8.5pt;
+                font-weight: 600;
             }}
             QListWidget#logList {{
                 background: #ffffff;
                 border: none;
-                border-top: 1px solid #e5eaf1;
+                border-top: 1px solid #e8edf4;
                 padding: 12px 16px 16px 16px;
                 outline: none;
-                color: #475569;
-                font-size: 14px;
+                color: #526078;
+                font-size: 9.5pt;
             }}
             QListWidget#logList::item {{
-                background: #ffffff;
-                border: 1px solid #e5eaf1;
-                border-radius: 8px;
-                margin: 5px 0;
+                background: #f8fafc;
+                border: 1px solid #e7ecf3;
+                border-radius: 10px;
+                margin: 4px 0;
                 padding: 11px 12px;
                 min-height: 34px;
             }}
+            QListWidget#logList::item:hover {{
+                background: #f3f6fb;
+                border: 1px solid #dce4f0;
+            }}
             QListWidget#logList::item:selected {{
-                background: #eef4ff;
-                color: #1d4ed8;
+                background: #edf3ff;
+                color: #2855cc;
+                border: 1px solid #d3dffc;
             }}
             QLabel#statChip {{
-                background: #eaf1ff;
-                color: #2563eb;
-                border: 1px solid #cbdcff;
-                border-radius: 8px;
+                background: #edf3ff;
+                color: #3567e8;
+                border: 1px solid #d3dffc;
+                border-radius: 9px;
                 padding: 7px 12px;
-                font-size: 13px;
-                font-weight: 800;
+                font-size: 9pt;
+                font-weight: 600;
             }}
             QLineEdit, QTextEdit {{
                 background: #ffffff;
-                border: 1px solid #cbd5e1;
-                border-radius: 8px;
+                border: 1px solid #d8e0eb;
+                border-radius: 10px;
                 padding: 9px 11px;
-                color: #111827;
-                selection-background-color: #dfeeff;
-                font-size: 14px;
+                color: #142033;
+                selection-background-color: #dce7ff;
+                font-size: 9.5pt;
             }}
             QLineEdit {{
                 min-height: 30px;
@@ -1869,65 +2050,66 @@ class BiliPulseWindow(QMainWindow):
                 min-height: 88px;
             }}
             QLineEdit:focus, QTextEdit:focus {{
-                border: 1px solid #2563eb;
+                border: 1px solid #5d82ef;
                 background: #ffffff;
             }}
             QLineEdit#settingsDisplay {{
-                background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 8px;
+                background: #f9fbfd;
+                border: 1px solid #dfe5ee;
+                border-radius: 9px;
                 padding: 0 14px;
                 min-height: 36px;
-                font-size: 14px;
+                font-size: 9.5pt;
             }}
             QWidget#stepperField {{
                 background: transparent;
             }}
             QSpinBox#stepperInput, QDoubleSpinBox#stepperInput {{
                 background: #ffffff;
-                border: 1px solid #cbd5e1;
-                border-radius: 8px;
+                border: 1px solid #d8e0eb;
+                border-radius: 10px;
                 padding: 9px 11px;
-                color: #111827;
-                font-size: 14px;
+                color: #142033;
+                font-size: 9.5pt;
                 min-height: 30px;
             }}
             QSpinBox#stepperInput:focus, QDoubleSpinBox#stepperInput:focus {{
-                border: 1px solid #2563eb;
+                border: 1px solid #5d82ef;
                 background: #ffffff;
             }}
             QWidget#stepperButtonsWrap {{
                 background: transparent;
             }}
             QPushButton#stepperButton {{
-                background: #f6f8fb;
-                color: #64748b;
-                border: 1px solid #d8e0ea;
-                border-radius: 8px;
+                background: #f6f8fc;
+                color: #748197;
+                border: 1px solid #dfe5ee;
+                border-radius: 9px;
                 min-width: 38px;
                 max-width: 38px;
                 min-height: 20px;
                 max-height: 20px;
-                font-size: 12px;
-                font-weight: 700;
+                font-size: 8.5pt;
+                font-weight: 600;
                 padding: 0;
             }}
             QPushButton#stepperButton:hover {{
                 background: #edf3ff;
+                border: 1px solid #cedcfc;
             }}
             QPushButton#stepperButton:pressed {{
                 background: #e0eaff;
             }}
             QCheckBox#softCheck {{
-                color: #334155;
-                font-size: 14px;
+                color: #35435a;
+                font-size: 9.5pt;
                 spacing: 10px;
             }}
             QCheckBox::indicator {{
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-                border: 1px solid #cbd5e1;
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                border: 1px solid #cfd8e5;
                 background: #ffffff;
             }}
             QCheckBox::indicator:hover {{
@@ -1935,8 +2117,8 @@ class BiliPulseWindow(QMainWindow):
                 background: #f8fafc;
             }}
             QCheckBox::indicator:checked {{
-                border: 1px solid #047857;
-                background: #047857;
+                border: 1px solid #0b8b64;
+                background: #0b8b64;
                 image: url("{self.check_icon_path.as_posix()}");
             }}
             QCheckBox::indicator:checked:hover {{
@@ -1944,59 +2126,67 @@ class BiliPulseWindow(QMainWindow):
                 background: #03664b;
             }}
             QPushButton {{
-                border-radius: 8px;
+                border-radius: 10px;
                 padding: 0 14px;
-                min-height: 40px;
+                min-height: 38px;
                 font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
-                font-size: 14px;
-                font-weight: 700;
+                font-size: 9.5pt;
+                font-weight: 600;
                 border: 1px solid transparent;
             }}
             QPushButton[compact="true"] {{
                 padding: 0 12px;
                 min-height: 34px;
-                font-size: 13px;
-                font-weight: 700;
+                font-size: 9pt;
+                font-weight: 600;
             }}
             QPushButton[styleType="primary"] {{
-                background: #2563eb;
+                background: #3b6df6;
                 color: #ffffff;
-                border: 1px solid #2563eb;
+                border: 1px solid #3b6df6;
             }}
             QPushButton[styleType="primary"]:hover {{
-                background: #1d4ed8;
+                background: #315fda;
+                border: 1px solid #315fda;
+            }}
+            QPushButton[styleType="primary"]:pressed {{
+                background: #294fb5;
+                border: 1px solid #294fb5;
             }}
             QPushButton[styleType="warm"] {{
-                background: #fff7e8;
-                color: #b86b16;
-                border: 1px solid #f3d6a5;
+                background: #fff7ed;
+                color: #b35d13;
+                border: 1px solid #f2d4b0;
             }}
             QPushButton[styleType="warm"]:hover {{
-                background: #ffefd1;
+                background: #ffedd7;
             }}
             QPushButton[styleType="accent"] {{
-                background: #eaf1ff;
-                color: #2563eb;
-                border: 1px solid #cbdcff;
+                background: #edf3ff;
+                color: #3567e8;
+                border: 1px solid #d3dffc;
             }}
             QPushButton[styleType="accent"]:hover {{
-                background: #dfeaff;
+                background: #dfe8ff;
+                border: 1px solid #c1d2fb;
             }}
             QPushButton[styleType="ghost"] {{
-                background: #f6f8fb;
-                color: #334155;
-                border: 1px solid #d8e0ea;
+                background: #f7f9fc;
+                color: #35435a;
+                border: 1px solid #dfe5ee;
             }}
             QPushButton[styleType="ghost"]:hover {{
-                background: #edf3ff;
+                background: #eef3fb;
+                border: 1px solid #cfd9e8;
             }}
             QPushButton[styleType="soft"] {{
                 background: #ffffff;
-                color: #334155;
-                border: 1px solid #d8e0ea;
+                color: #35435a;
+                border: 1px solid #dfe5ee;
             }}
             QPushButton[styleType="soft"]:hover {{
-                background: #f8fafc;
+                background: #f7f9fc;
+                border: 1px solid #ccd6e5;
             }}
             QPushButton[styleType="danger"] {{
                 background: #fff1f2;
@@ -2008,37 +2198,50 @@ class BiliPulseWindow(QMainWindow):
                 border: 1px solid #fda4af;
             }}
             QPushButton:disabled {{
-                background: #e7edf4;
-                color: #94a3b8;
-                border-color: #e7edf4;
+                background: #edf0f5;
+                color: #a2adbd;
+                border-color: #e6eaf0;
+            }}
+            QPushButton:focus {{
+                border: 1px solid #7e9cf1;
             }}
             QScrollBar:vertical {{
                 background: transparent;
-                width: 10px;
-                margin: 8px 2px 8px 0;
+                width: 8px;
+                margin: 8px 1px 8px 1px;
             }}
             QScrollBar::handle:vertical {{
-                background: #cbd5e1;
+                background: #c2ccda;
                 min-height: 28px;
-                border-radius: 5px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: #9eabbd;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 height: 0;
             }}
             QMenu {{
                 background: #ffffff;
-                border: 1px solid #d8e0ea;
-                border-radius: 10px;
+                border: 1px solid #dfe5ee;
+                border-radius: 11px;
                 padding: 8px;
             }}
             QMenu::item {{
                 padding: 8px 12px;
                 border-radius: 8px;
-                color: #111827;
+                color: #142033;
             }}
             QMenu::item:selected {{
-                background: #eaf1ff;
-                color: #2563eb;
+                background: #edf3ff;
+                color: #3567e8;
+            }}
+            QToolTip {{
+                background: #14213a;
+                color: #ffffff;
+                border: 1px solid #2d4266;
+                padding: 6px 9px;
+                font-size: 9pt;
             }}
             """
         )
@@ -2216,6 +2419,16 @@ class BiliPulseWindow(QMainWindow):
             else:
                 short_message = "状态已更新"
             self.topbar_status.setText(f"● {short_message}")
+            if hasattr(self, "overview_status_value"):
+                self.overview_status_value.setText(f"● {short_message}")
+            if hasattr(self, "status_pill"):
+                if "执行中" in short_message:
+                    pill_text = "● 运行中"
+                elif "处理" in short_message or "失败" in message:
+                    pill_text = "● 待处理"
+                else:
+                    pill_text = "● 待命"
+                self.status_pill.setText(pill_text)
 
     def clear_log_view(self) -> None:
         self.log_text.clear()
@@ -2686,19 +2899,34 @@ class BiliPulseWindow(QMainWindow):
 
         icon_path = QT_ICON_PATH
         check_icon_path = CHECK_MARK_PATH
+        resource_dir = Path(getattr(sys, "_MEIPASS", APP_DIR))
+        bundled_icon_path = resource_dir / "push_to_bili_qt.ico"
+        bundled_check_icon_path = resource_dir / "check_mark_green.png"
+
+        if getattr(sys, "frozen", False) and bundled_icon_path.exists():
+            icon_path = bundled_icon_path
+        if getattr(sys, "frozen", False) and bundled_check_icon_path.exists():
+            check_icon_path = bundled_check_icon_path
+
         icon_path.parent.mkdir(parents=True, exist_ok=True)
         check_icon_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not icon_path.exists():
-            size = 256
-            image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            render_size = 1024
+            image = Image.new("RGBA", (render_size, render_size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(image)
-            draw.rounded_rectangle((18, 18, 238, 238), radius=58, fill="#0f172a")
-            draw.rounded_rectangle((42, 42, 214, 214), radius=46, fill="#17243b")
-            draw.ellipse((154, 44, 212, 102), fill="#2563eb")
-            draw.rounded_rectangle((72, 86, 182, 176), radius=28, fill="#ffffff")
-            draw.polygon([(116, 104), (116, 158), (156, 131)], fill="#2563eb")
-            image.save(icon_path, format="ICO", sizes=[(256, 256), (128, 128), (64, 64), (32, 32), (16, 16)])
+            draw.rounded_rectangle((64, 64, 960, 960), radius=224, fill="#0c1830")
+            draw.polygon([(256, 270), (256, 754), (585, 512)], fill="#ffffff")
+            draw.polygon(
+                [(566, 270), (682, 270), (908, 512), (682, 754), (566, 754), (790, 512)],
+                fill="#3b6df6",
+            )
+            image = image.resize((256, 256), Image.Resampling.LANCZOS)
+            image.save(
+                icon_path,
+                format="ICO",
+                sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (24, 24), (16, 16)],
+            )
 
         if not check_icon_path.exists():
             image = Image.new("RGBA", (24, 24), (0, 0, 0, 0))
@@ -2715,7 +2943,12 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_WINDOW_TITLE)
     app.setQuitOnLastWindowClosed(False)
-    app.setFont(QFont("Microsoft YaHei", 10))
+    app_font = QFont("Microsoft YaHei")
+    app_font.setPointSizeF(10.0)
+    app_font.setWeight(QFont.Weight.Normal)
+    app_font.setHintingPreference(QFont.HintingPreference.PreferFullHinting)
+    app_font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+    app.setFont(app_font)
 
     window = BiliPulseWindow()
     if getattr(window, "_already_running", False):

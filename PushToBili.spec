@@ -4,7 +4,10 @@ import pathlib
 
 from PyInstaller.depend import bindepend
 
-datas = []
+datas = [
+    ('push_to_bili_qt.ico', '.'),
+    ('check_mark_green.png', '.'),
+]
 binaries = []
 hiddenimports = [
     'shadowcopy',
@@ -105,4 +108,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='push_to_bili_icon.ico',
 )
