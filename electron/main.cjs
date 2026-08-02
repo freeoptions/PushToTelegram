@@ -3,7 +3,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { spawn, execFileSync } = require("node:child_process");
 
-const APP_NAME = "PushToBili";
+const APP_NAME = "PushToTelegram";
 const APP_FEATURE_DESCRIPTION = "抓取 B站视频并推送到 Telegram";
 const TRAY_TOOLTIP = `${APP_NAME} - ${APP_FEATURE_DESCRIPTION}`;
 let backendProcess = null;
@@ -147,8 +147,8 @@ function normalizeExportPayload(config) {
 
 function getBackendCommand() {
   const candidates = [
-    path.join(process.resourcesPath, "PushToBiliBackend.exe"),
-    path.join(getAppBaseDir(), "PushToBiliBackend.exe"),
+    path.join(process.resourcesPath, "PushToTelegramBackend.exe"),
+    path.join(getAppBaseDir(), "PushToTelegramBackend.exe"),
   ];
 
   for (const candidate of candidates) {
@@ -172,7 +172,7 @@ function killExistingBackendProcesses() {
   try {
     execFileSync(
       "taskkill.exe",
-      ["/F", "/IM", "PushToBiliBackend.exe", "/T"],
+      ["/F", "/IM", "PushToTelegramBackend.exe", "/T"],
       { windowsHide: true, stdio: "ignore" }
     );
   } catch {

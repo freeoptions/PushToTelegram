@@ -31,7 +31,7 @@ class TelegramClient:
             raise TelegramError(payload.get("description", "Telegram 发送失败"))
 
     def send_test_message(self) -> None:
-        self.send_message("PushToBilibili 测试消息：Telegram 连接正常。")
+        self.send_message("PushToTelegram 测试消息：Telegram 连接正常。")
 
 def build_batch_video_message(items: list[str]) -> str:
     return "\n".join(item.strip() for item in items if item.strip())

@@ -476,7 +476,7 @@ export default function App() {
           <div className="brand-block">
             <div className="brand-mark">B</div>
             <div className="brand-copy">
-              <h1>PushToBili</h1>
+              <h1>PushToTelegram</h1>
               <span>B 站投稿提醒工具</span>
             </div>
           </div>

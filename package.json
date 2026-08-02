@@ -1,5 +1,5 @@
 {
-  "name": "push-to-bili-desktop",
+  "name": "push-to-telegram-desktop",
   "private": true,
   "version": "0.1.0",
   "description": "Single-process desktop app for Bilibili upload monitor and Telegram push.",
@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "python app.py",
-    "build:pyqt": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& '.\\\\.venv\\\\Scripts\\\\pyinstaller.exe' 'PushToBili.spec'\"",
+    "build:pyqt": ".venv\\Scripts\\python.exe -m PyInstaller PushToTelegram.spec",
     "dist": "npm run build:pyqt"
   },
   "dependencies": {

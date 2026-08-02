@@ -14,6 +14,55 @@ hiddenimports = [
     'wmi',
 ]
 
+# The desktop client uses classic Qt Widgets only. PySide's general hook also
+# collects optional QML/PDF/virtual-keyboard components and all translations;
+# excluding those keeps one-file extraction substantially smaller and faster.
+excluded_modules = [
+    'PIL',
+    'PySide6.QtNetwork',
+    'PySide6.QtOpenGL',
+    'PySide6.QtPdf',
+    'PySide6.QtQml',
+    'PySide6.QtQuick',
+    'PySide6.QtVirtualKeyboard',
+]
+
+excluded_bundle_prefixes = (
+    'pyside6\\translations\\',
+    'pyside6\\plugins\\generic\\',
+    'pyside6\\plugins\\networkinformation\\',
+    'pyside6\\plugins\\platforminputcontexts\\',
+    'pyside6\\plugins\\tls\\',
+)
+excluded_bundle_files = {
+    'pyside6\\opengl32sw.dll',
+    'pyside6\\qt6network.dll',
+    'pyside6\\qt6opengl.dll',
+    'pyside6\\qt6pdf.dll',
+    'pyside6\\qt6qml.dll',
+    'pyside6\\qt6qmlmeta.dll',
+    'pyside6\\qt6qmlmodels.dll',
+    'pyside6\\qt6qmlworkerscript.dll',
+    'pyside6\\qt6quick.dll',
+    'pyside6\\qt6virtualkeyboard.dll',
+    'pyside6\\qtnetwork.pyd',
+    'pyside6\\plugins\\platforms\\qdirect2d.dll',
+    'pyside6\\plugins\\platforms\\qminimal.dll',
+    'pyside6\\plugins\\platforms\\qoffscreen.dll',
+}
+
+
+def _remove_unused_bundle_entries(entries):
+    kept = []
+    for entry in entries:
+        destination = str(entry[0]).replace('/', '\\').casefold()
+        if destination in excluded_bundle_files:
+            continue
+        if destination.startswith(excluded_bundle_prefixes):
+            continue
+        kept.append(entry)
+    return kept
+
 
 _orig_get_paths_for_parent_directory_preservation = bindepend._get_paths_for_parent_directory_preservation
 
@@ -83,10 +132,12 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=excluded_modules,
     noarchive=False,
-    optimize=0,
+    optimize=1,
 )
+a.binaries = _remove_unused_bundle_entries(a.binaries)
+a.datas = _remove_unused_bundle_entries(a.datas)
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -95,7 +146,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='PushToBili',
+    name='PushToTelegram',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

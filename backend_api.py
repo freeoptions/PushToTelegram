@@ -113,7 +113,7 @@ STATE = BackendState()
 
 
 class BackendHandler(BaseHTTPRequestHandler):
-    server_version = "PushToBiliBackend/1.0"
+    server_version = "PushToTelegramBackend/1.0"
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path

@@ -10,8 +10,6 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-from pypinyin import Style, lazy_pinyin
-
 from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QRectF, QCoreApplication, QThread, QTimer, Qt, Signal
 from PySide6.QtGui import (
     QAction,
@@ -62,14 +60,18 @@ from settings import APP_DIR, AppConfig, CHECK_MARK_PATH, LOG_PATH, QT_ICON_PATH
 from store import SentVideoStore
 
 
-APP_WINDOW_TITLE = "PushToBilibili"
-TRAY_TOOLTIP = "PushToBilibili - 抓取推送到tg"
-APP_USER_MODEL_ID = "PushToTelegram.PushToBilibili"
+APP_NAME = "PushToTelegram"
+APP_WINDOW_TITLE = APP_NAME
+TRAY_TOOLTIP = f"{APP_NAME} - B站投稿监控与推送"
+APP_USER_MODEL_ID = "PushToTelegram.Desktop"
 
 
 @lru_cache(maxsize=2048)
 def build_search_index(text: str) -> str:
     """Build a cached Chinese, full-pinyin and initial-letter search index."""
+    # pypinyin loads sizeable dictionaries. Defer it until the user actually searches.
+    from pypinyin import Style, lazy_pinyin
+
     normalized = text.casefold()
     full_pinyin = "".join(lazy_pinyin(normalized))
     initials = "".join(lazy_pinyin(normalized, style=Style.FIRST_LETTER))
@@ -97,7 +99,7 @@ def enable_high_dpi() -> None:
 
 def build_export_file_name() -> str:
     now = datetime.now()
-    return f"PushToBili_exportConfig_{now:%Y-%m-%d %H_%M_%S}.json"
+    return f"{APP_NAME}_exportConfig_{now:%Y-%m-%d %H_%M_%S}.json"
 
 
 class WorkerThread(QThread):
@@ -326,6 +328,9 @@ class BiliPulseWindow(QMainWindow):
 
         self._mutex_handle = None
         self._tray_notice_logged = False
+        self.tray_icon: QSystemTrayIcon | None = None
+        self.tray_menu: QMenu | None = None
+        self.tray_icon_resource: QIcon | None = None
         self._busy = False
         self._worker: WorkerThread | None = None
         self._autosave_ready = False
@@ -448,7 +453,7 @@ class BiliPulseWindow(QMainWindow):
         text_wrap = QVBoxLayout()
         text_wrap.setContentsMargins(0, 0, 0, 0)
         text_wrap.setSpacing(2)
-        title = QLabel("PushToBili")
+        title = QLabel(APP_NAME)
         title.setObjectName("topbarTitle")
         subtitle = QLabel("B 站投稿提醒工具")
         subtitle.setObjectName("topbarSubtitle")
@@ -508,7 +513,7 @@ class BiliPulseWindow(QMainWindow):
         badge = QLabel("B 站投稿提醒工具")
         badge.setObjectName("brandBadge")
 
-        title = QLabel("PushToBilibili")
+        title = QLabel(APP_NAME)
         title.setObjectName("brandTitle")
 
         text_wrap.addWidget(badge)
@@ -2249,20 +2254,21 @@ class BiliPulseWindow(QMainWindow):
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self.log("当前系统托盘不可用，托盘功能已跳过。")
             return
-        self.tray_icon = QSystemTrayIcon(QIcon(str(self.icon_path)), self)
+        self.tray_icon_resource = QIcon(str(self.icon_path))
+        self.tray_icon = QSystemTrayIcon(self.tray_icon_resource, self)
         self.tray_icon.setToolTip(TRAY_TOOLTIP)
         self.tray_icon.activated.connect(self._on_tray_activated)
 
-        menu = QMenu(self)
+        self.tray_menu = QMenu(self)
         show_action = QAction("显示软件", self)
         show_action.triggered.connect(self.show_window)
         exit_action = QAction("退出", self)
         exit_action.triggered.connect(self.exit_application)
-        menu.addAction(show_action)
-        menu.addAction(exit_action)
-        self.tray_icon.setContextMenu(menu)
+        self.tray_menu.addAction(show_action)
+        self.tray_menu.addAction(exit_action)
+        self.tray_icon.setContextMenu(self.tray_menu)
         self.tray_icon.show()
-        self.log("托盘功能已启用，可最小化到系统托盘。")
+        self.log("托盘功能已启用，关闭窗口可隐藏到系统托盘。")
 
     def _load_config_to_ui(self) -> None:
         self.token_edit.setText(self.config.bot_token)
@@ -2373,7 +2379,7 @@ class BiliPulseWindow(QMainWindow):
         return count
 
     def _setup_logger(self) -> logging.Logger:
-        logger = logging.getLogger("PushToBilibili")
+        logger = logging.getLogger(APP_NAME)
         logger.setLevel(logging.INFO)
         logger.handlers.clear()
         handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
@@ -2509,7 +2515,7 @@ class BiliPulseWindow(QMainWindow):
                 store.close()
 
             payload = {
-                "app_name": "PushToBili",
+                "app_name": APP_NAME,
                 "export_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "telegram": {
                     "bot_token": config.bot_token,
@@ -2544,9 +2550,9 @@ class BiliPulseWindow(QMainWindow):
             file_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
             self._set_status_text("配置已导出")
             self.log(f"配置已导出到指定位置：{file_path}")
-            if hasattr(self, "tray_icon") and self.tray_icon.isVisible():
+            if self.tray_icon is not None and self.tray_icon.isVisible():
                 self.tray_icon.showMessage(
-                    "PushToBili",
+                    APP_NAME,
                     "配置已导出到指定位置",
                     QSystemTrayIcon.MessageIcon.Information,
                     2200,
@@ -2820,7 +2826,7 @@ class BiliPulseWindow(QMainWindow):
             return False
 
     def _acquire_single_instance(self) -> bool:
-        mutex_name = "Global\\PushToBilibili.SingleInstance"
+        mutex_name = "Global\\PushToTelegram.SingleInstance"
         handle = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
         if not handle:
             return True
@@ -2863,25 +2869,18 @@ class BiliPulseWindow(QMainWindow):
     def hide_window(self) -> None:
         self._save_config_silent()
         self.hide()
-        if hasattr(self, "tray_icon") and self.tray_icon.isVisible() and not self._tray_notice_logged:
+        if self.tray_icon is not None and self.tray_icon.isVisible() and not self._tray_notice_logged:
             self.tray_icon.showMessage(
-                "PushToBilibili",
-                "软件已最小化到系统托盘，双击托盘图标可重新打开。",
+                APP_NAME,
+                "软件已隐藏到系统托盘，单击托盘图标可重新打开。",
                 QSystemTrayIcon.MessageIcon.Information,
                 2500,
             )
         self._tray_notice_logged = True
 
-    def changeEvent(self, event) -> None:  # type: ignore[override]
-        if event.type() == event.Type.WindowStateChange and self.isMinimized():
-            QTimer.singleShot(0, self.hide_window)
-            event.accept()
-            return
-        super().changeEvent(event)
-
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_config_silent()
-        if hasattr(self, "tray_icon") and self.tray_icon.isVisible():
+        if self.tray_icon is not None and self.tray_icon.isVisible():
             event.ignore()
             self.hide_window()
             return
@@ -2889,14 +2888,30 @@ class BiliPulseWindow(QMainWindow):
 
     def exit_application(self) -> None:
         self._save_config_silent()
-        if hasattr(self, "tray_icon"):
-            self.tray_icon.hide()
+        self._dispose_tray()
         self._release_single_instance()
         QApplication.instance().quit()
 
-    def _ensure_assets(self) -> tuple[Path, Path]:
-        from PIL import Image, ImageDraw
+    def _dispose_tray(self) -> None:
+        tray = self.tray_icon
+        menu = self.tray_menu
+        if tray is not None:
+            tray.setVisible(False)
+            try:
+                tray.activated.disconnect(self._on_tray_activated)
+            except (RuntimeError, TypeError):
+                pass
+            tray.setContextMenu(None)
+            tray.setIcon(QIcon())
+            tray.deleteLater()
+        if menu is not None:
+            menu.clear()
+            menu.deleteLater()
+        self.tray_icon = None
+        self.tray_menu = None
+        self.tray_icon_resource = None
 
+    def _ensure_assets(self) -> tuple[Path, Path]:
         icon_path = QT_ICON_PATH
         check_icon_path = CHECK_MARK_PATH
         resource_dir = Path(getattr(sys, "_MEIPASS", APP_DIR))
@@ -2911,7 +2926,17 @@ class BiliPulseWindow(QMainWindow):
         icon_path.parent.mkdir(parents=True, exist_ok=True)
         check_icon_path.parent.mkdir(parents=True, exist_ok=True)
 
+        Image = None
+        ImageDraw = None
+        if not icon_path.exists() or not check_icon_path.exists():
+            # Pillow is only a development fallback. Frozen builds always carry both assets.
+            import importlib
+
+            Image = importlib.import_module("PIL.Image")
+            ImageDraw = importlib.import_module("PIL.ImageDraw")
+
         if not icon_path.exists():
+            assert Image is not None and ImageDraw is not None
             render_size = 1024
             image = Image.new("RGBA", (render_size, render_size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(image)
@@ -2929,6 +2954,7 @@ class BiliPulseWindow(QMainWindow):
             )
 
         if not check_icon_path.exists():
+            assert Image is not None and ImageDraw is not None
             image = Image.new("RGBA", (24, 24), (0, 0, 0, 0))
             draw = ImageDraw.Draw(image)
             draw.line((6, 12, 10, 16), fill="white", width=3)

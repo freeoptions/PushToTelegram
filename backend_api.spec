@@ -92,7 +92,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="PushToBiliBackend",
+    name="PushToTelegramBackend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
