@@ -5,7 +5,8 @@ import pathlib
 from PyInstaller.depend import bindepend
 
 datas = [
-    ('push_to_bili_qt.ico', '.'),
+    ('artemis_symbol.ico', '.'),
+    ('assets/artemis_symbol_1024.png', '.'),
     ('check_mark_green.png', '.'),
 ]
 binaries = []
@@ -159,5 +160,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='push_to_bili_icon.ico',
+    icon='artemis_symbol.ico',
 )

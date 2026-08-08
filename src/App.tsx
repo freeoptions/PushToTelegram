@@ -14,6 +14,7 @@ import {
   UploadCloud,
   X
 } from "lucide-react";
+import artemisLogo from "../assets/artemis_symbol_1024.png";
 
 type UpTarget = {
   uid: string;
@@ -474,7 +475,7 @@ export default function App() {
       <div className="app-window">
         <header className="app-topbar">
           <div className="brand-block">
-            <div className="brand-mark">B</div>
+            <img className="brand-mark" src={artemisLogo} alt="" aria-hidden="true" />
             <div className="brand-copy">
               <h1>PushToTelegram</h1>
               <span>B 站投稿提醒工具</span>

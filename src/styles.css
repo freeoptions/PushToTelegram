@@ -852,15 +852,9 @@ button {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 9px;
-  color: #fff;
-  background: linear-gradient(135deg, #2563eb, #0f766e);
-  font-weight: 900;
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
+  object-fit: contain;
 }
 
 .brand-copy {

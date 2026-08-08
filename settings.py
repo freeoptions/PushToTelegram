@@ -25,8 +25,8 @@ DATA_DIR = APP_DIR / "data"
 CONFIG_PATH = APP_DIR / "config.json"
 DB_PATH = APP_DIR / "history.db"
 LOG_PATH = APP_DIR / "app.log"
-ICON_PATH = APP_DIR / "push_to_bili_icon.ico"
-QT_ICON_PATH = APP_DIR / "push_to_bili_qt.ico"
+APP_ICON_PATH = APP_DIR / "artemis_symbol.ico"
+BRAND_LOGO_PATH = APP_DIR / "assets" / "artemis_symbol_1024.png"
 CHECK_MARK_PATH = APP_DIR / "check_mark_green.png"
 
 
@@ -38,8 +38,6 @@ def _migrate_legacy_data() -> None:
         DATA_DIR / "config.json": CONFIG_PATH,
         DATA_DIR / "history.db": DB_PATH,
         DATA_DIR / "app.log": LOG_PATH,
-        DATA_DIR / "push_to_bili_icon.ico": ICON_PATH,
-        DATA_DIR / "push_to_bili_qt.ico": QT_ICON_PATH,
         DATA_DIR / "check_mark_green.png": CHECK_MARK_PATH,
     }
 

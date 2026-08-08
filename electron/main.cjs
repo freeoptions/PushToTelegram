@@ -278,16 +278,10 @@ function createWindow() {
 
 function getTrayIconPath() {
   const candidates = [
-    path.join(process.resourcesPath, "push_to_bili_icon.ico"),
-    path.join(process.resourcesPath, "push_to_bili_qt.ico"),
-    path.join(process.resourcesPath, "app.asar.unpacked", "data", "push_to_bili_icon.ico"),
-    path.join(process.resourcesPath, "data", "push_to_bili_icon.ico"),
-    path.join(app.getAppPath(), "data", "push_to_bili_icon.ico"),
-    path.join(process.resourcesPath, "app.asar.unpacked", "data", "push_to_bili_qt.ico"),
-    path.join(process.resourcesPath, "data", "push_to_bili_qt.ico"),
-    path.join(app.getAppPath(), "data", "push_to_bili_qt.ico"),
-    path.join(getAppBaseDir(), "push_to_bili_icon.ico"),
-    path.join(getAppBaseDir(), "push_to_bili_qt.ico")
+    path.join(process.resourcesPath, "artemis_symbol.ico"),
+    path.join(process.resourcesPath, "artemis_symbol_1024.png"),
+    path.join(app.getAppPath(), "assets", "artemis_symbol_1024.png"),
+    path.join(getAppBaseDir(), "artemis_symbol.ico")
   ];
 
   for (const candidate of candidates) {

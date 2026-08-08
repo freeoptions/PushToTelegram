@@ -20,6 +20,7 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QPen,
+    QPixmap,
     QResizeEvent,
     QTextCharFormat,
     QTextCursor,
@@ -56,7 +57,7 @@ from PySide6.QtWidgets import (
 )
 
 from pending_retry_store import PendingTelegramRetryStore
-from settings import APP_DIR, AppConfig, CHECK_MARK_PATH, LOG_PATH, QT_ICON_PATH, UpTarget, ensure_data_dir
+from settings import APP_DIR, APP_ICON_PATH, AppConfig, BRAND_LOGO_PATH, CHECK_MARK_PATH, LOG_PATH, UpTarget, ensure_data_dir
 from store import SentVideoStore
 
 
@@ -346,7 +347,7 @@ class BiliPulseWindow(QMainWindow):
 
         self.config = AppConfig.load()
         self.logger = self._setup_logger()
-        self.icon_path, self.check_icon_path = self._ensure_assets()
+        self.icon_path, self.brand_logo_path, self.check_icon_path = self._ensure_assets()
         self.auto_timer = QTimer(self)
         self.auto_timer.timeout.connect(self._trigger_auto_check)
         self.config_autosave_timer = QTimer(self)
@@ -447,7 +448,14 @@ class BiliPulseWindow(QMainWindow):
         mark = QLabel()
         mark.setObjectName("topbarMark")
         mark.setFixedSize(46, 46)
-        mark.setPixmap(QIcon(str(self.icon_path)).pixmap(42, 42))
+        mark.setPixmap(
+            QPixmap(str(self.brand_logo_path)).scaled(
+                42,
+                42,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
         mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         text_wrap = QVBoxLayout()
@@ -504,7 +512,15 @@ class BiliPulseWindow(QMainWindow):
         mark = QLabel()
         mark.setObjectName("brandMark")
         mark.setFixedSize(64, 64)
-        mark.setPixmap(QIcon(str(self.icon_path)).pixmap(60, 60))
+        mark.setPixmap(
+            QPixmap(str(self.brand_logo_path)).scaled(
+                60,
+                60,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        )
+        mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         text_wrap = QVBoxLayout()
         text_wrap.setContentsMargins(0, 2, 0, 0)
@@ -1787,9 +1803,9 @@ class BiliPulseWindow(QMainWindow):
                 font-weight: 600;
             }}
             QLabel#brandMark {{
-                background: #3b6df6;
-                border-radius: 11px;
-                padding: 8px;
+                background: transparent;
+                border: none;
+                padding: 0;
             }}
             QLabel#brandBadge {{
                 color: #8294af;
@@ -2911,47 +2927,36 @@ class BiliPulseWindow(QMainWindow):
         self.tray_menu = None
         self.tray_icon_resource = None
 
-    def _ensure_assets(self) -> tuple[Path, Path]:
-        icon_path = QT_ICON_PATH
+    def _ensure_assets(self) -> tuple[Path, Path, Path]:
+        icon_path = APP_ICON_PATH
+        brand_logo_path = BRAND_LOGO_PATH
         check_icon_path = CHECK_MARK_PATH
         resource_dir = Path(getattr(sys, "_MEIPASS", APP_DIR))
-        bundled_icon_path = resource_dir / "push_to_bili_qt.ico"
+        bundled_icon_path = resource_dir / "artemis_symbol.ico"
+        bundled_brand_logo_path = resource_dir / "artemis_symbol_1024.png"
         bundled_check_icon_path = resource_dir / "check_mark_green.png"
 
         if getattr(sys, "frozen", False) and bundled_icon_path.exists():
             icon_path = bundled_icon_path
+        if getattr(sys, "frozen", False) and bundled_brand_logo_path.exists():
+            brand_logo_path = bundled_brand_logo_path
         if getattr(sys, "frozen", False) and bundled_check_icon_path.exists():
             check_icon_path = bundled_check_icon_path
 
-        icon_path.parent.mkdir(parents=True, exist_ok=True)
         check_icon_path.parent.mkdir(parents=True, exist_ok=True)
+        if not icon_path.exists():
+            raise RuntimeError(f"缺少应用图标资源：{icon_path}")
+        if not brand_logo_path.exists():
+            raise RuntimeError(f"缺少品牌 Logo 资源：{brand_logo_path}")
 
         Image = None
         ImageDraw = None
-        if not icon_path.exists() or not check_icon_path.exists():
+        if not check_icon_path.exists():
             # Pillow is only a development fallback. Frozen builds always carry both assets.
             import importlib
 
             Image = importlib.import_module("PIL.Image")
             ImageDraw = importlib.import_module("PIL.ImageDraw")
-
-        if not icon_path.exists():
-            assert Image is not None and ImageDraw is not None
-            render_size = 1024
-            image = Image.new("RGBA", (render_size, render_size), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(image)
-            draw.rounded_rectangle((64, 64, 960, 960), radius=224, fill="#0c1830")
-            draw.polygon([(256, 270), (256, 754), (585, 512)], fill="#ffffff")
-            draw.polygon(
-                [(566, 270), (682, 270), (908, 512), (682, 754), (566, 754), (790, 512)],
-                fill="#3b6df6",
-            )
-            image = image.resize((256, 256), Image.Resampling.LANCZOS)
-            image.save(
-                icon_path,
-                format="ICO",
-                sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (24, 24), (16, 16)],
-            )
 
         if not check_icon_path.exists():
             assert Image is not None and ImageDraw is not None
@@ -2961,7 +2966,7 @@ class BiliPulseWindow(QMainWindow):
             draw.line((10, 16, 18, 7), fill="white", width=3)
             image.save(check_icon_path, format="PNG")
 
-        return icon_path, check_icon_path
+        return icon_path, brand_logo_path, check_icon_path
 
 
 def main() -> None:
