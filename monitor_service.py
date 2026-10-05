@@ -14,6 +14,7 @@ from youtube_client import YouTubeClient, YouTubeClientError
 
 
 LogFunc = Callable[[str], None]
+MIN_REQUEST_DELAY_SECONDS = 5.0
 
 
 @dataclass(slots=True)
@@ -78,6 +79,8 @@ class MonitorService:
         store = SentVideoStore()
         result = CheckResult()
         pending_items: list[tuple[str, str, VideoItem]] = []
+        checkpoint_updates: list[tuple[str, str, int]] = []
+        check_started_at = int(time.time())
 
         try:
             bili = self._build_bili_client_safe(result)
@@ -97,7 +100,31 @@ class MonitorService:
                     )
                     self._log(log_action)
                     try:
-                        videos = bili.fetch_recent_videos(target.uid, self._config.fetch_count)
+                        incremental_check = False
+                        scan_complete = True
+                        if mode == "check":
+                            checkpoint = store.get_checkpoint("bilibili", target.uid)
+                            if checkpoint is not None:
+                                incremental_check = True
+                                videos, scan_complete = bili.fetch_videos_since(
+                                    target.uid,
+                                    checkpoint,
+                                    page_delay=self._random_request_delay(),
+                                )
+                            else:
+                                sent_bvids = store.get_sent_bvids(target.uid)
+                                if sent_bvids:
+                                    incremental_check = True
+                                    videos, scan_complete = bili.fetch_videos_since(
+                                        target.uid,
+                                        None,
+                                        stop_bvids=sent_bvids,
+                                        page_delay=self._random_request_delay(),
+                                    )
+                                else:
+                                    videos = bili.fetch_recent_videos(target.uid, self._config.fetch_count)
+                        else:
+                            videos = bili.fetch_recent_videos(target.uid, self._config.fetch_count)
                     except BiliRiskControlError as exc:
                         result.failed_count += 1
                         self._error_log(f"结果：{action_text} UID {target.uid} 触发 B站 风控，已中断本次任务。{exc}")
@@ -116,6 +143,14 @@ class MonitorService:
                         continue
 
                     result.checked_count += 1
+                    if mode == "check" and not scan_complete:
+                        result.failed_count += 1
+                        self._error_log(
+                            f"结果：UID {target.uid} 本次最多翻页 10 页，仍未到达检查边界；"
+                            "已处理当前页面，但不会推进检查时间，避免静默漏掉更旧投稿。"
+                        )
+                    if mode == "check" and scan_complete:
+                        checkpoint_updates.append(("bilibili", target.uid, check_started_at))
                     if not videos:
                         self._log(f"结果：UID {target.uid} 没有拿到投稿数据。")
                         current_index += 1
@@ -123,7 +158,11 @@ class MonitorService:
                         continue
 
                     if mode == "check":
-                        pending = self._pick_pending_videos(store, target.uid, videos)
+                        pending = (
+                            self._pick_unsent_videos(store, videos)
+                            if incremental_check
+                            else self._pick_pending_videos(store, target.uid, videos)
+                        )
                         empty_message = f"结果：{self._display_name(target.uid, videos[0].up_name, target.label)} 没有新投稿。"
                         collected_message = "结果：收集到待发送"
                     else:
@@ -200,7 +239,9 @@ class MonitorService:
             else:
                 current_index += len(self._config.youtube_targets)
 
-            self._send_videos(telegram, store, pending_items, result)
+            send_successfully = self._send_videos(telegram, store, pending_items, result)
+            if send_successfully and mode == "check":
+                self._save_checkpoints(store, checkpoint_updates, result)
             return result
         finally:
             store.close()
@@ -225,6 +266,7 @@ class MonitorService:
             self._error_log(f"结果：发送失败，已跳过当前批次。已保留本批链接，可稍后点击重试发送。{exc}")
             return False
 
+        all_saved = True
         for platform, label, video in items:
             try:
                 store.save_sent(
@@ -239,13 +281,27 @@ class MonitorService:
                     )
                 )
             except Exception as exc:
+                all_saved = False
                 result.failed_count += 1
                 self._error_log(f"结果：发送历史写入失败，已跳过该记录。{video.up_name} / {video.title}。{exc}")
                 continue
 
             result.sent_count += 1
             self._log(f"结果：已成功发送到 Telegram：{self._display_name(video.uid, video.up_name, label)} / {video.title}")
-        return True
+        return all_saved
+
+    def _save_checkpoints(
+        self,
+        store: SentVideoStore,
+        updates: list[tuple[str, str, int]],
+        result: CheckResult,
+    ) -> None:
+        for platform, uid, check_started_at in updates:
+            try:
+                store.save_checkpoint(platform, uid, check_started_at)
+            except Exception as exc:
+                result.failed_count += 1
+                self._error_log(f"结果：保存 {platform} UID {uid} 的检查时间失败，下次将重新检查。{exc}")
 
     def _save_pending_retry_items(self, items: list[PendingVideoItem]) -> None:
         try:
@@ -307,20 +363,34 @@ class MonitorService:
         pending.reverse()
         return pending
 
+    @staticmethod
+    def _pick_unsent_videos(
+        store: SentVideoStore,
+        videos: list[VideoItem],
+    ) -> list[VideoItem]:
+        pending = [video for video in videos if not store.was_sent(video.uid, video.bvid)]
+        pending.reverse()
+        return pending
+
     def _sleep_before_next_up(self, current_index: int, total: int) -> None:
         if current_index >= total - 1:
             return
         self._sleep_request_interval()
 
     def _sleep_request_interval(self) -> None:
-        min_seconds = max(0.0, self._config.request_interval_seconds_min)
-        max_seconds = max(min_seconds, self._config.request_interval_seconds_max)
-        if max_seconds <= 0:
+        sleep_seconds = self._random_request_delay()
+        if sleep_seconds <= 0:
             return
 
-        sleep_seconds = round(random.uniform(min_seconds, max_seconds), 1)
         self._log(f"结果：等待 {sleep_seconds} 秒后检查下一个 UP。")
         time.sleep(sleep_seconds)
+
+    def _random_request_delay(self) -> float:
+        min_seconds = max(MIN_REQUEST_DELAY_SECONDS, self._config.request_interval_seconds_min)
+        max_seconds = max(min_seconds, self._config.request_interval_seconds_max)
+        if max_seconds <= 0:
+            return 0.0
+        return round(random.uniform(min_seconds, max_seconds), 1)
 
     def _build_bili_client(self) -> BiliClient:
         return BiliClient(

@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 import pathlib
 
 from PyInstaller.depend import bindepend
@@ -9,6 +10,9 @@ datas = [
     ('assets/artemis_symbol_1024.png', '.'),
     ('check_mark_green.png', '.'),
 ]
+system_icu = pathlib.Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "icuuc.dll"
+if system_icu.is_file():
+    datas.append((str(system_icu), "PySide6"))
 binaries = []
 hiddenimports = [
     'shadowcopy',
@@ -132,7 +136,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['runtime_qt.py'],
     excludes=excluded_modules,
     noarchive=False,
     optimize=1,

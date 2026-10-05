@@ -37,6 +37,16 @@ class SentVideoStore:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sync_checkpoints (
+                platform TEXT NOT NULL,
+                uid TEXT NOT NULL,
+                last_check_started_at INTEGER NOT NULL,
+                PRIMARY KEY (platform, uid)
+            )
+            """
+        )
         self._ensure_platform_column()
         self._conn.commit()
 
@@ -66,6 +76,39 @@ class SentVideoStore:
             (uid, bvid),
         ).fetchone()
         return row is not None
+
+    def get_sent_bvids(self, uid: str) -> set[str]:
+        rows = self._conn.execute(
+            "SELECT bvid FROM sent_videos WHERE uid = ?",
+            (uid,),
+        ).fetchall()
+        return {str(row[0]) for row in rows if row[0]}
+
+    def get_checkpoint(self, platform: str, uid: str) -> int | None:
+        row = self._conn.execute(
+            """
+            SELECT last_check_started_at
+            FROM sync_checkpoints
+            WHERE platform = ? AND uid = ?
+            LIMIT 1
+            """,
+            (platform, uid),
+        ).fetchone()
+        if row is None:
+            return None
+        return int(row[0])
+
+    def save_checkpoint(self, platform: str, uid: str, check_started_at: int) -> None:
+        self._conn.execute(
+            """
+            INSERT INTO sync_checkpoints (platform, uid, last_check_started_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(platform, uid) DO UPDATE SET
+                last_check_started_at = excluded.last_check_started_at
+            """,
+            (platform, uid, int(check_started_at)),
+        )
+        self._conn.commit()
 
     def save_sent(self, item: SentVideo) -> None:
         self._conn.execute(

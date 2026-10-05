@@ -1065,7 +1065,7 @@ class BiliPulseWindow(QMainWindow):
         self.browser_cookie_checkbox.stateChanged.connect(lambda _: self._refresh_summary())
 
         self._add_form_field(grid, 0, 0, "自动检查", self.auto_hours_display)
-        self._add_form_field(grid, 0, 1, "抓取条数", self.fetch_count_display)
+        self._add_form_field(grid, 0, 1, "首次/补发条数", self.fetch_count_display)
         self._add_form_field(grid, 0, 2, "首轮同步", self.first_sync_display)
         self._add_form_field(grid, 0, 3, "请求间隔", self.request_range_display)
         self._add_form_field(grid, 0, 4, "Cookie", self.cookie_mode_button)

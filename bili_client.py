@@ -30,6 +30,8 @@ DEFAULT_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
 }
 
+MAX_SYNC_PAGES = 10
+
 
 class BiliClientError(RuntimeError):
     pass
@@ -80,10 +82,86 @@ class BiliClient:
         if not uid.isdigit():
             raise BiliClientError(f"UID 不合法：{uid}")
 
+        videos, _total_count = self._fetch_video_page(
+            uid,
+            page=1,
+            page_size=max(1, min(count, 30)),
+        )
+        return videos
+
+    def fetch_videos_since(
+        self,
+        uid: str,
+        since_timestamp: int | None,
+        *,
+        stop_bvids: set[str] | None = None,
+        page_delay: float = 0.0,
+    ) -> tuple[list[VideoItem], bool]:
+        """Fetch videos newer than a checkpoint, walking pages until the boundary."""
+        uid = uid.strip()
+        if not uid.isdigit():
+            raise BiliClientError(f"UID 不合法：{uid}")
+
+        page = 1
+        page_size = 30
+        videos: list[VideoItem] = []
+        seen_page_signatures: set[tuple[str, ...]] = set()
+        known_bvids = stop_bvids or set()
+        scan_complete = False
+
+        for _page_index in range(MAX_SYNC_PAGES):
+            page_videos, total_count = self._fetch_video_page(
+                uid,
+                page=page,
+                page_size=page_size,
+            )
+            if not page_videos:
+                scan_complete = True
+                break
+
+            page_signature = tuple(video.bvid for video in page_videos)
+            if page_signature in seen_page_signatures:
+                break
+            seen_page_signatures.add(page_signature)
+
+            boundary_reached = False
+            for video in page_videos:
+                if video.bvid in known_bvids:
+                    boundary_reached = True
+                    break
+                if since_timestamp is not None and video.published_at < since_timestamp:
+                    boundary_reached = True
+                    break
+                videos.append(video)
+
+            if boundary_reached:
+                scan_complete = True
+                break
+
+            reached_last_page = len(page_videos) < page_size
+            if total_count > 0 and page * page_size >= total_count:
+                reached_last_page = True
+            if reached_last_page:
+                scan_complete = True
+                break
+
+            page += 1
+            if page_delay > 0:
+                time.sleep(page_delay)
+
+        return videos, scan_complete
+
+    def _fetch_video_page(
+        self,
+        uid: str,
+        *,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[VideoItem], int]:
         params = {
             "mid": uid,
-            "pn": "1",
-            "ps": str(max(1, min(count, 30))),
+            "pn": str(max(1, page)),
+            "ps": str(max(1, min(page_size, 30))),
             "order": "pubdate",
             "tid": "0",
             "platform": "web",
@@ -105,7 +183,10 @@ class BiliClient:
                 raise BiliRiskControlError(message)
             raise BiliClientError(message)
 
-        vlist = (((payload.get("data") or {}).get("list") or {}).get("vlist")) or []
+        data = payload.get("data") or {}
+        page_info = data.get("page") or {}
+        total_count = int(page_info.get("count", 0) or 0)
+        vlist = ((data.get("list") or {}).get("vlist")) or []
         videos: list[VideoItem] = []
         for item in vlist:
             bvid = str(item.get("bvid", "")).strip()
@@ -122,7 +203,7 @@ class BiliClient:
                     published_at=int(item.get("created", 0) or 0),
                 )
             )
-        return videos
+        return videos, total_count
 
     def _sign_wbi(self, params: dict[str, str]) -> dict[str, str]:
         img_key, sub_key = self._get_wbi_keys()
